@@ -4,9 +4,36 @@ import { NpcData, FactionData, LocationData, EntityType, GeneratedEntity, Rumor,
 import { IconSkull, IconMap, IconUsers, IconRefresh, IconSpinner, IconNetwork, IconPlus, IconMagic, IconBriefcase, IconDownload, IconEye, IconX, IconDice } from './Icons';
 import { EditControls, InputField, TextAreaField, ArrayField } from './FormFields';
 import { RelationshipGraph } from './RelationshipGraph';
-import { exportNpcToFoundry } from '../utils/foundryExport';
+import { exportNpcToFoundry, exportBundleToFoundry, FOUNDRY_IMPORT_MACRO } from '../utils/foundryExport';
 
-// --- Shared Components ---
+// --- Helper Components ---
+const MacroModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) => {
+    if (!isOpen) return null;
+    return (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur" onClick={onClose}>
+            <div className="bg-panel border border-gray-700 p-6 rounded-lg max-w-2xl w-full shadow-2xl" onClick={e => e.stopPropagation()}>
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-xl font-serif text-white">Macro de Importação (Foundry VTT)</h3>
+                    <button onClick={onClose}><IconX /></button>
+                </div>
+                <p className="text-sm text-gray-400 mb-2">
+                    Crie uma nova <strong>Macro (Script)</strong> no Foundry VTT e cole o código abaixo. Execute a macro para importar os arquivos "bundle_*.json".
+                </p>
+                <textarea 
+                    readOnly 
+                    className="w-full h-64 bg-black text-green-400 font-mono text-xs p-4 rounded border border-gray-800 focus:outline-none mb-4"
+                    value={FOUNDRY_IMPORT_MACRO}
+                />
+                <button 
+                    onClick={() => { navigator.clipboard.writeText(FOUNDRY_IMPORT_MACRO); alert("Código copiado!"); onClose(); }}
+                    className="w-full bg-blood hover:bg-red-900 text-white py-2 rounded uppercase tracking-widest text-xs font-bold btn-press"
+                >
+                    Copiar Código
+                </button>
+            </div>
+        </div>
+    );
+};
 
 const EntityLink = ({ name, onOpen, worldState }: { name: string, onOpen?: (n: string) => void, worldState?: WorldContextState }) => {
     if (!onOpen || !worldState) return <>{name}</>;
@@ -156,6 +183,7 @@ export const NpcCard = ({
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState(data);
+  const [showMacroModal, setShowMacroModal] = useState(false);
 
   useEffect(() => { setFormData(data); }, [data]);
 
@@ -172,15 +200,25 @@ export const NpcCard = ({
       }
   }
 
+  const hasMinions = data.minions && data.minions.length > 0;
   const isV2 = !!data.rumors; // Check if it's the new model
 
   return (
     <div className="bg-paper text-gray-900 rounded shadow-lg overflow-hidden border-t-4 border-blood flex flex-col md:flex-row relative transition-all duration-500 hover:shadow-2xl">
       <EditControls isEditing={isEditing} onEdit={() => setIsEditing(true)} onSave={handleSave} onCancel={() => { setIsEditing(false); setFormData(data); }} />
+      <MacroModal isOpen={showMacroModal} onClose={() => setShowMacroModal(false)} />
       
       {!isEditing && (
          <div className="absolute bottom-2 right-2 z-20 flex gap-2">
-            <button onClick={() => exportNpcToFoundry(data)} className="bg-black/80 hover:bg-purple-900 text-white p-2 rounded shadow transition-colors" title="Exportar para Foundry VTT"><IconDice /></button>
+            {hasMinions && worldState && (
+                <>
+                    <button onClick={() => setShowMacroModal(true)} className="bg-gray-800 hover:bg-gray-700 text-gray-300 p-2 rounded shadow transition-colors text-xs uppercase tracking-widest font-bold" title="Ver Código da Macro">Macro</button>
+                    <button onClick={() => exportBundleToFoundry(data, worldState)} className="bg-purple-900/90 hover:bg-purple-800 text-white px-3 py-2 rounded shadow transition-colors text-xs uppercase tracking-widest font-bold flex items-center gap-1" title="Exportar Pacote (NPC + Lacaios)">
+                         <IconUsers /> Exportar Pacote
+                    </button>
+                </>
+            )}
+            <button onClick={() => exportNpcToFoundry(data)} className="bg-black/80 hover:bg-red-900 text-white p-2 rounded shadow transition-colors" title="Exportar Ficha (Foundry VTT)"><IconDice /></button>
          </div>
       )}
 
@@ -193,6 +231,12 @@ export const NpcCard = ({
               <span className="font-bold font-serif bg-gray-900 text-paper px-2 py-0.5 rounded text-sm shadow">{data.clan}</span>
             </div>
             
+            {data.concept && (
+                <div className="mb-4 -mt-2 text-gray-600 font-serif text-sm uppercase tracking-widest">
+                    {data.concept}
+                </div>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
               <div className="space-y-1">
                 <p><strong>Geração:</strong> {data.generation}</p>
@@ -209,6 +253,7 @@ export const NpcCard = ({
                 <div className="flex flex-wrap gap-2 mt-1">
                   {data.influence.map((inf, i) => <span key={i} className="bg-gray-800 text-white px-2 py-0.5 text-xs rounded shadow-sm transform hover:scale-105 transition-transform">{inf}</span>)}
                 </div>
+                {data.attributeProfile && <p className="text-xs text-gray-500 mt-2">Foco: {data.attributeProfile}</p>}
               </div>
             </div>
 
@@ -316,6 +361,9 @@ export const NpcCard = ({
                <InputField label="Nome" value={formData.name} onChange={v => setFormData({...formData, name: v})} />
                <InputField label="Clã" value={formData.clan} onChange={v => setFormData({...formData, clan: v})} />
             </div>
+            
+            <InputField label="Conceito" value={formData.concept || ''} onChange={v => setFormData({...formData, concept: v})} />
+
             <div className="grid grid-cols-2 gap-4">
                <InputField label="Geração" value={formData.generation} onChange={v => setFormData({...formData, generation: v})} />
                <InputField label="Senhor" value={formData.sire} onChange={v => setFormData({...formData, sire: v})} />
@@ -328,8 +376,8 @@ export const NpcCard = ({
             <InputField label="Pais Mortais" value={formData.parents || ''} onChange={v => setFormData({...formData, parents: v})} />
 
             <div className="grid grid-cols-2 gap-4">
-               <InputField label="Nascimento (DD/MM/AAAA HH:MM)" value={formData.birthDate || ''} onChange={v => setFormData({...formData, birthDate: v})} />
-               <InputField label="Abraço (DD/MM/AAAA)" value={formData.embraceDate || ''} onChange={v => setFormData({...formData, embraceDate: v})} />
+               <InputField label="Nascimento" value={formData.birthDate || ''} onChange={v => setFormData({...formData, birthDate: v})} />
+               <InputField label="Abraço" value={formData.embraceDate || ''} onChange={v => setFormData({...formData, embraceDate: v})} />
             </div>
 
             <InputField label="Citação" value={formData.quote} onChange={v => setFormData({...formData, quote: v})} />
@@ -351,6 +399,8 @@ export const NpcCard = ({
     </div>
   );
 };
+
+// ... (Rest of the file: FactionCard, LocationCard, DisplayCard - unchanged)
 
 // --- Faction Card ---
 export const FactionCard = ({ 

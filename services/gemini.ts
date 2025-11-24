@@ -5,6 +5,62 @@ import { EntityType, WorldContextState, NpcData, FactionData, LocationData, Rela
 const MODEL_NAME = "gemini-2.5-flash";
 const IMAGE_MODEL_NAME = "gemini-2.5-flash-image";
 
+// --- V20 Reference Data ---
+const V20_ARCHETYPES_TEXT = `
+ARQUITETO: Busca construir algo de valor duradouro.
+AUTOCRATA: Busca poder e controle por si só.
+BOBO DA CORTE: Vê o mundo como tolices e usa o humor para iluminar ou ridicularizar.
+BON VIVANT: Vive intensamente, aproveitando cada segundo.
+CAÇADOR DE EMOÇÕES: Vive pela adrenalina do perigo.
+CAMALEÃO: Cauteloso, passa-se por outros para sobreviver.
+CELEBRANTE: Encontra alegria em sua paixão ou causa.
+COMPETIDOR: Encara tudo como um desafio a ser vencido.
+CONFORMISTA: Um seguidor que busca segurança no grupo.
+CRIANÇA: Imatura, prefere que outros cuidem dela.
+CUIDADOR: Encontra consolo em proteger e confortar os outros.
+DEFENSOR: Luta para proteger uma causa ou inovação frágil.
+DESVIANTE: Marginalizado por gostos ou crenças não convencionais.
+DILETANTE: Interessa-se por tudo, mas não se aprofunda em nada.
+ENIGMA: Ações bizarras e desconcertantes.
+FANÁTICO: Consumido por uma causa única.
+FERA: Respeita apenas a força e a conquista pessoal.
+FILÓSOFO: Examina tudo logicamente em busca de padrões.
+GALANTE: Busca atenção e admiração.
+GURU: Inspira os outros espiritualmente ou ideologicamente.
+IDEALISTA: Acredita em um propósito maior ou moral superior.
+JUIZ: Busca justiça e a resolução de disputas.
+MALANDRO: Egoísta, coloca seus interesses sempre em primeiro lugar.
+MÁRTIR: Sofre por sua causa ou pelos outros.
+MASOQUISTA: Testa seus limites através da dor e provação.
+MERCENÁRIO: Tudo tem um preço; tudo é negócio.
+MONSTRO: Aceita sua natureza de predador e ferramenta das trevas.
+OLHO DA TEMPESTADE: O caos o segue, mas ele permanece calmo.
+PEDAGOGO: Quer ensinar e garantir que sua mensagem seja ouvida.
+PENITENTE: Busca expiar o pecado de sua existência.
+PERFECCIONISTA: Exige execução impecável de si e dos outros.
+RANZINZA: Amargo, cínico e pessimista.
+REBELDE: Descontente com o status quo, mina as autoridades.
+SÁDICO: Vive para causar dor e sofrimento por prazer.
+SHOW DE HORRORES: Deleita-se em chocar e amedrontar.
+SOBREVIVENTE: Nunca desiste, resiste a qualquer custo.
+SOLDADO: Cumpre ordens, mas com independência tática.
+SOLITÁRIO: Prefere sua própria companhia.
+TRADICIONALISTA: Prefere métodos consagrados e resiste à mudança.
+TRAPACEIRO: Usa mentiras e manipulação para atalhar o sucesso.
+TIRANO: Quer liderar para impor ordem ao caos.
+VALENTÃO: Acredita que o poder (físico ou social) dita o que é certo.
+VISIONÁRIO: Persegue o que poucos têm coragem de imaginar.
+`;
+
+const validArchetypes = [
+  "Arquiteto", "Autocrata", "Bobo da Corte", "Bon Vivant", "Caçador de Emoções", "Camaleão", 
+  "Celebrante", "Competidor", "Conformista", "Criança", "Cuidador", "Defensor", "Desviante", 
+  "Diletante", "Enigma", "Fanático", "Fera", "Filósofo", "Galante", "Guru", "Idealista", 
+  "Juiz", "Malandro", "Mártir", "Masoquista", "Mercenário", "Monstro", "Olho da Tempestade", 
+  "Pedagogo", "Penitente", "Perfeccionista", "Ranzinza", "Rebelde", "Sádico", "Show de Horrores", 
+  "Sobrevivente", "Soldado", "Solitário", "Tradicionalista", "Trapaceiro", "Tirano", "Valentão", "Visionário"
+];
+
 // --- Schemas ---
 
 const rumorSchema: Schema = {
@@ -25,11 +81,17 @@ const npcSchema: Schema = {
     clan: { type: Type.STRING },
     generation: { type: Type.STRING },
     sire: { type: Type.STRING, description: "Nome do senhor ou 'Desconhecido'" },
-    nature: { type: Type.STRING },
-    demeanor: { type: Type.STRING },
+    nature: { type: Type.STRING, enum: validArchetypes, description: "O verdadeiro 'Eu' do personagem." },
+    demeanor: { type: Type.STRING, enum: validArchetypes, description: "A máscara social que ele usa." },
+    concept: { type: Type.STRING, description: "Conceito resumido (Ex: Hacker Anarquista, Socialite Decadente)." },
+    attributeProfile: { 
+      type: Type.STRING, 
+      enum: ["Physical/Social/Mental", "Physical/Mental/Social", "Social/Physical/Mental", "Social/Mental/Physical", "Mental/Physical/Social", "Mental/Social/Physical"],
+      description: "A ordem de prioridade dos Atributos (Primário/Secundário/Terciário)."
+    },
     history: { 
       type: Type.STRING, 
-      description: "Uma narrativa estruturada em 5 parágrafos: 1. Vida Mortal (Quem era), 2. O Abraço (O trauma), 3. Primeiras Noites (Adaptação), 4. Ponto de Virada (Evento definidor), 5. Ambição Atual e Conflito." 
+      description: "Uma narrativa estruturada em 5 parágrafos: 1. Vida Mortal (A Máscara), 2. O Abraço (O Catalisador), 3. Primeiras Noites (O Aprendizado), 4. Ponto de Virada (O Conflito), 5. Ambição Atual e o Futuro." 
     },
     appearance: { type: Type.STRING },
     influence: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Áreas de influência (ex: Polícia, Finanças)" },
@@ -43,7 +105,7 @@ const npcSchema: Schema = {
     dislikes: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Exatamente 5 coisas que o NPC odeia" },
     rumors: { type: Type.ARRAY, items: rumorSchema, description: "Lista de rumores sobre o NPC (Verdadeiros, Falsos, Exageros)" }
   },
-  required: ["id", "name", "clan", "history", "influence", "birthDate", "embraceDate", "parents", "likes", "dislikes", "rumors"],
+  required: ["id", "name", "clan", "nature", "demeanor", "concept", "attributeProfile", "history", "influence", "birthDate", "embraceDate", "parents", "likes", "dislikes", "rumors"],
 };
 
 const factionSchema: Schema = {
@@ -113,11 +175,13 @@ const upgradeNpcSchema: Schema = {
     birthDate: { type: Type.STRING, description: "DD/MM/AAAA HH:MM" },
     embraceDate: { type: Type.STRING, description: "DD/MM/AAAA" },
     parents: { type: Type.STRING },
+    concept: { type: Type.STRING },
+    attributeProfile: { type: Type.STRING, enum: ["Physical/Social/Mental", "Physical/Mental/Social", "Social/Physical/Mental", "Social/Mental/Physical", "Mental/Physical/Social", "Mental/Social/Physical"] },
     likes: { type: Type.ARRAY, items: { type: Type.STRING }, description: "5 itens" },
     dislikes: { type: Type.ARRAY, items: { type: Type.STRING }, description: "5 itens" },
     rumors: { type: Type.ARRAY, items: rumorSchema }
   },
-  required: ["birthDate", "embraceDate", "parents", "likes", "dislikes", "rumors"]
+  required: ["birthDate", "embraceDate", "parents", "concept", "attributeProfile", "likes", "dislikes", "rumors"]
 };
 
 const multiNpcSchema: Schema = {
@@ -162,10 +226,9 @@ const frequenterSuggestionSchema: Schema = {
 // --- Helper to serialize world state SAFELY (No Images) ---
 
 const serializeWorldState = (state: WorldContextState): string => {
-  // IMPORTANT: Strip base64 images to prevent token overflow
   const sanitizedState = {
     npcs: state.npcs.map(({ imageUrl, ...rest }) => rest),
-    factions: state.factions.map(({ imageUrl, relationshipMap, ...rest }) => rest), // relationships map is also bulky, but usually text. Images are the killer.
+    factions: state.factions.map(({ imageUrl, relationshipMap, ...rest }) => rest),
     locations: state.locations.map(({ imageUrl, ...rest }) => rest),
   };
   return JSON.stringify(sanitizedState, null, 2);
@@ -185,18 +248,15 @@ export const generateEntity = async (
 ): Promise<any> => {
   
   const ai = getClient(apiKey);
-  
-  // Use sanitized context to allow full narrative retention without images
   const worldContext = serializeWorldState(worldState);
   
   let systemInstruction = `Você é um Narrador de Vampiro: A Máscara Edição de 20 Anos (V20). 
   Sua tarefa é gerar lore criativa, profunda e interconectada em PORTUGUÊS DO BRASIL (PT-BR).
-  NÃO use regras do sistema (pontos, dados). Foque na narrativa, relacionamentos, atmosfera e intriga.
+  NÃO use regras mecânicas detalhadas (fichas completas com bolinhas) a menos que solicitado no schema (como AttributeProfile).
+  Foque na narrativa, relacionamentos, atmosfera e intriga.
   
-  CRÍTICO: Você deve integrar a nova criação com o 'ESTADO ATUAL DO MUNDO' fornecido abaixo. 
-  Se o usuário pedir um líder de uma facção existente, use o nome dessa facção. 
-  Se o usuário criar uma facção, inclua NPCs existentes nela se fizer sentido.
-  Se a entrada do usuário estiver vazia, seja criativo e crie algo que se encaixe na vibração atual.
+  LISTA OFICIAL DE ARQUÉTIPOS V20 (Use APENAS estes para Natureza e Comportamento):
+  ${V20_ARCHETYPES_TEXT}
   
   ESTADO ATUAL DO MUNDO (JSON):
   ${worldContext}`;
@@ -210,18 +270,18 @@ export const generateEntity = async (
       prompt = `Crie um NPC detalhado. ${userInput ? `Diretriz do Usuário: "${userInput}"` : "Crie um Membro único e interessante."}
       
       OBRIGATÓRIO - ESTRUTURA DA HISTÓRIA (Mínimo 5 Parágrafos):
-      1. Vida Mortal (A Máscara): Quem ele era antes? Suas paixões humanas.
-      2. O Abraço (O Catalisador): Como ele morreu? Foi violento, sedutor ou acidental? O trauma inicial.
-      3. As Primeiras Noites (O Aprendizado): Como foi sua adaptação à Seita e ao Clã?
-      4. O Ponto de Virada (O Conflito): Um evento específico que mudou sua visão de mundo ou definiu sua personalidade atual.
-      5. Ambição Atual e o Futuro (A Trama): O que ele quer AGORA? Que planos secretos ele move?
+      1. Vida Mortal (A Máscara): Quem ele era? Conceito e paixões humanas.
+      2. O Abraço (O Catalisador): Trauma e transformação.
+      3. As Primeiras Noites (O Aprendizado): Adaptação à não-vida.
+      4. O Ponto de Virada (O Conflito): Evento que definiu sua Natureza.
+      5. Ambição Atual e o Futuro (A Trama): Planos atuais.
 
-      DADOS EXTRAS:
-      - Data de Nascimento (Dia, Mês, Ano, Hora).
-      - Data do Abraço (Dia, Mês, Ano).
-      - Nomes dos Pais Mortais.
-      - Liste 5 Gostos e 5 Desgostos.
-      - Crie rumores detalhados.`;
+      DADOS EXTRAS OBRIGATÓRIOS:
+      - Natureza e Comportamento (Escolha da lista oficial).
+      - Conceito (Resumo da identidade).
+      - Attribute Profile (Prioridade de atributos Físico/Social/Mental para fins de regra).
+      - Datas Completas e Pais Mortais.
+      - Rumores e Gostos.`;
       break;
     case EntityType.FACTION:
       responseSchema = factionSchema;
@@ -260,24 +320,23 @@ export const generateEntity = async (
 
 export const upgradeNpcData = async (npc: NpcData, apiKey: string): Promise<Partial<NpcData>> => {
     const ai = getClient(apiKey);
-    const systemInstruction = `Você é um Narrador de V20. Sua tarefa é atualizar um NPC antigo para o novo formato de ficha detalhada.
-    Analise a história e personalidade existente e deduza/crie os novos campos.
+    const systemInstruction = `Você é um Narrador de V20. Sua tarefa é atualizar um NPC antigo para o novo formato de ficha detalhada e compatível com o sistema V20 (Foundry).
+    
+    LISTA DE ARQUÉTIPOS VÁLIDOS:
+    ${V20_ARCHETYPES_TEXT}
+    
     Use Português do Brasil.`;
 
     const prompt = `NPC Existente:
     Nome: ${npc.name}
     Clã: ${npc.clan}
-    História Original: ${npc.history}
-    Natureza/Comportamento: ${npc.nature}/${npc.demeanor}
+    História: ${npc.history}
+    Natureza/Comportamento Atual: ${npc.nature}/${npc.demeanor}
 
-    Tarefa: Gere os novos campos obrigatórios e REESCREVA a história se ela for curta:
-    
-    1. História (Opcional, se a atual for fraca): Reescreva em 5 parágrafos.
-    2. Data de Nascimento (Dia, Mês, Ano, Hora).
-    3. Data do Abraço (Dia, Mês, Ano).
-    4. Nomes dos Pais.
-    5. 5 Gostos e 5 Desgostos.
-    6. Rumores (Verdadeiros, Exageros, Falsos).`;
+    Tarefa:
+    1. Defina 'Concept' e 'AttributeProfile' (Físico/Social/Mental) baseados na história.
+    2. Gere os campos novos se faltarem (Datas, Pais, Rumores).
+    3. Reescreva a história se for muito curta.`;
 
     try {
         const response = await ai.models.generateContent({
@@ -305,28 +364,23 @@ export const harmonizeNpcProfile = async (npc: NpcData, apiKey: string): Promise
     const ai = getClient(apiKey);
     
     const systemInstruction = `Você é um Narrador de V20.
-    O usuário alterou manualmente partes da ficha deste NPC (provavelmente a História).
-    Sua tarefa é REESCREVER os campos derivados (Natureza, Comportamento, Aparencia, Rumores, Gostos, Desgostos) para que eles façam sentido com a NOVA História/Dados fornecidos.
+    O usuário alterou manualmente a História do NPC.
+    Reescreva a ficha completa para harmonizar com a nova história.
     
-    Mantenha o Nome, Clã, Geração e Senhor, a menos que a história contradiga isso explicitamente.
-    Garanta que a Data de Nascimento e Abraço façam sentido cronológico com a história.
-    Use Português do Brasil.`;
+    LISTA DE ARQUÉTIPOS VÁLIDOS:
+    ${V20_ARCHETYPES_TEXT}
+    
+    Garanta que Natureza, Comportamento e AttributeProfile (Atributos Prioritários) façam sentido com a nova narrativa.`;
 
     const prompt = `
-    FICHA DO NPC (Com edições manuais do usuário):
+    FICHA DO NPC (Com edições manuais):
     Nome: ${npc.name}
     Clã: ${npc.clan}
-    História Atual (FONTE DA VERDADE): ${npc.history}
-    
-    Outros dados atuais (podem estar desatualizados em relação à história):
-    Natureza: ${npc.nature}
-    Aparência: ${npc.appearance}
-    Rumores: ${JSON.stringify(npc.rumors)}
+    História Atual (VERDADE): ${npc.history}
     
     TAREFA:
-    Reescreva a ficha completa (todos os campos do schema) para harmonizar com a nova História.
-    Se a história diz que ele é um nobre, mas a aparência diz que é um mendigo, mude a aparência para nobre.
-    Gere datas completas (Dia/Mês/Ano/Hora) e nomes dos pais se faltarem.`;
+    Reescreva todos os campos para combinar com a história.
+    Retorne o JSON completo do NPC.`;
 
     try {
         const response = await ai.models.generateContent({
@@ -335,7 +389,7 @@ export const harmonizeNpcProfile = async (npc: NpcData, apiKey: string): Promise
             config: {
                 systemInstruction: systemInstruction,
                 responseMimeType: "application/json",
-                responseSchema: npcSchema, // Return full valid NPC object
+                responseSchema: npcSchema,
                 temperature: 0.85,
             }
         });
@@ -357,34 +411,21 @@ export const generateFactionMembers = async (
 ): Promise<NpcData[]> => {
   const ai = getClient(apiKey);
   const worldContext = serializeWorldState(worldState);
-  
   const isNumber = !isNaN(parseInt(userInput));
   const count = isNumber ? parseInt(userInput) : "varios";
 
-  const systemInstruction = `Você é um Narrador de Vampiro: A Máscara (V20).
-  Sua tarefa é preencher a hierarquia de uma facção específica.
+  const systemInstruction = `Você é um Narrador de V20.
+  Preencha a hierarquia da facção com NPCs detalhados.
+  Use os ARQUÉTIPOS OFICIAIS para Natureza/Comportamento.
+  Defina Concept e AttributeProfile para cada um.
   
-  REGRAS:
-  1. DIVIDA O PODER: Distribua o território, os recursos e as áreas de influência da facção entre estes membros.
-  2. HIERARQUIA: Crie papéis claros (Líder, Executor, Espião, Conselheiro, etc) baseados na solicitação.
-  3. CONFLITO: Crie rivalidades internas ou segredos entre eles.
-  4. Use Português do Brasil.
-  5. GERE FICHAS COMPLETAS COM A ESTRUTURA DE HISTÓRIA DE 5 PARÁGRAFOS.
+  ${V20_ARCHETYPES_TEXT}
   
-  ESTADO DO MUNDO (JSON):
-  ${worldContext}`;
+  ESTADO DO MUNDO: ${worldContext}`;
 
-  let prompt = "";
-  
-  if (isNumber) {
-     prompt = `Gere ${count} NPCs membros da facção "${faction.name}".
-     Tipo da Facção: ${faction.type}.
-     Objetivos: ${faction.goals}.
-     Inclua para CADA UM: História Completa, Datas (Dia/Mês/Ano), Pais, Gostos, Desgostos, Rumores.`;
-  } else {
-     prompt = `Gere NPCs membros da facção "${faction.name}" preenchendo as seguintes funções: "${userInput}".
-     Inclua para CADA UM: História Completa, Datas (Dia/Mês/Ano), Pais, Gostos, Desgostos, Rumores.`;
-  }
+  const prompt = `Gere ${isNumber ? count : 'membros'} para a facção "${faction.name}" (${faction.type}).
+  ${!isNumber ? `Funções desejadas: ${userInput}` : ''}
+  Gere fichas completas (História 5 parágrafos, Concept, Atributos, etc).`;
 
   try {
     const response = await ai.models.generateContent({
@@ -408,6 +449,8 @@ export const generateFactionMembers = async (
     throw error;
   }
 };
+
+// ... (Rest of the file: generateFactionLocations, generateFactionResources, suggestFrequenters, generateLocationFrequenters, generateNpcMinion, applyWorldAdjustment, generateFactionMap, refineText, generateEntityImage - unchanged logic but ensure imports are correct if needed)
 
 export const generateFactionLocations = async (
   faction: FactionData,
@@ -557,7 +600,7 @@ export const generateLocationFrequenters = async (
     Se forem Mortais, foque em seus papéis (Barman, Segurança, Cliente VIP).
     Se forem Vampiros, crie membros que usam o local para caça ou política.
     Se forem Ghouls, crie servos do dono do local.
-    Use Português do Brasil.
+    Use ARQUÉTIPOS VÁLIDOS para Natureza/Comportamento.
     
     ESTADO DO MUNDO (JSON):
     ${worldContext}`;
@@ -601,7 +644,7 @@ export const generateNpcMinion = async (
     const systemInstruction = `Você é um Narrador de V20.
     Sua tarefa é criar um NPC subordinado (Lacaio, Ghoul ou Cria) para um NPC existente.
     Este novo NPC deve ser leal (ou secretamente ressentido) ao seu mestre.
-    Use Português do Brasil.
+    Use ARQUÉTIPOS VÁLIDOS.
     
     ESTADO DO MUNDO (JSON):
     ${worldContext}`;

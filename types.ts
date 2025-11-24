@@ -34,22 +34,30 @@ export interface NpcData {
   clan: string;
   generation: string;
   sire: string;
+  
+  // Core Personality & Archetypes
   nature: string;
   demeanor: string;
+  concept: string; // New: V20 Concept (e.g., "Criminal", "Drifter")
+  
+  // Stats Profile for Export (e.g., "Social/Mental/Physical")
+  attributeProfile?: string; 
+
   history: string;
   appearance: string;
   influence: string[];
   relationships: string[]; 
   quote: string;
   imageUrl?: string;
+  
   // V2 Fields
   birthDate?: string;
   embraceDate?: string;
-  parents?: string; // New field
-  likes?: string[]; // 5 items
-  dislikes?: string[]; // 5 items
+  parents?: string; 
+  likes?: string[]; 
+  dislikes?: string[]; 
   rumors?: Rumor[];
-  minions?: string[]; // Names of generated subordinates
+  minions?: string[]; 
 }
 
 export interface FactionData {
@@ -62,7 +70,7 @@ export interface FactionData {
   resources: string[];
   enemies: string[];
   imageUrl?: string;
-  relationshipMap?: RelationshipMapData; // New field for the map
+  relationshipMap?: RelationshipMapData; 
 }
 
 export interface LocationData {
@@ -73,7 +81,7 @@ export interface LocationData {
   atmosphere: string;
   security: string;
   description: string;
-  frequenters?: string[]; // New field for generated NPCs who hang out here
+  frequenters?: string[]; 
   imageUrl?: string;
 }
 
