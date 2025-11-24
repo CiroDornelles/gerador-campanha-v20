@@ -82,3 +82,7 @@ export const IconKey = () => (
 export const IconBriefcase = () => (
   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="14" x="2" y="7" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
 );
+
+export const IconDice = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.63 9.88-5.83-8.08a2 2 0 0 0-2.83-.5L2.37 6.45a2 2 0 0 0-.5 2.83l5.83 8.08a2 2 0 0 0 2.83.5l10.6-5.15a2 2 0 0 0 .5-2.83Z"/><path d="M22 10.37 11.23 15.5"/><path d="M6.3 7 2.3 12.33"/><path d="M12 22v-6.5"/><path d="m18 22-6-6.5 6-6.5"/></svg>
+);

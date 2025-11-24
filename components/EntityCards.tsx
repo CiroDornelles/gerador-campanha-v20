@@ -1,9 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { NpcData, FactionData, LocationData, EntityType, GeneratedEntity, Rumor, WorldContextState } from '../types';
-import { IconSkull, IconMap, IconUsers, IconRefresh, IconSpinner, IconNetwork, IconPlus, IconMagic, IconBriefcase, IconDownload, IconEye, IconX } from './Icons';
+import { IconSkull, IconMap, IconUsers, IconRefresh, IconSpinner, IconNetwork, IconPlus, IconMagic, IconBriefcase, IconDownload, IconEye, IconX, IconDice } from './Icons';
 import { EditControls, InputField, TextAreaField, ArrayField } from './FormFields';
 import { RelationshipGraph } from './RelationshipGraph';
+import { exportNpcToFoundry } from '../utils/foundryExport';
 
 // --- Shared Components ---
 
@@ -177,6 +178,12 @@ export const NpcCard = ({
     <div className="bg-paper text-gray-900 rounded shadow-lg overflow-hidden border-t-4 border-blood flex flex-col md:flex-row relative transition-all duration-500 hover:shadow-2xl">
       <EditControls isEditing={isEditing} onEdit={() => setIsEditing(true)} onSave={handleSave} onCancel={() => { setIsEditing(false); setFormData(data); }} />
       
+      {!isEditing && (
+         <div className="absolute bottom-2 right-2 z-20 flex gap-2">
+            <button onClick={() => exportNpcToFoundry(data)} className="bg-black/80 hover:bg-purple-900 text-white p-2 rounded shadow transition-colors" title="Exportar para Foundry VTT"><IconDice /></button>
+         </div>
+      )}
+
       <div className="flex-1 p-8 relative">
         {!isEditing ? (
           <div className="animate-fade-in-up">
