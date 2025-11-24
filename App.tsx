@@ -1,6 +1,7 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { EntityType, WorldContextState, NpcData, FactionData, LocationData, GeneratedEntity } from './types';
-import { generateEntity, generateEntityImage, generateFactionMap, generateFactionMembers, generateFactionLocations, generateFactionResources, upgradeNpcData, applyWorldAdjustment, harmonizeNpcProfile } from './services/gemini';
+import { generateEntity, generateEntityImage, generateFactionMap, generateFactionMembers, generateFactionLocations, generateFactionResources, upgradeNpcData, applyWorldAdjustment, harmonizeNpcProfile, generateLocationFrequenters, generateNpcMinion, suggestFrequenters } from './services/gemini';
 import { exportChronicleToPDF, exportSingleEntityPDF } from './utils/pdfExport';
 
 // Imported Components
@@ -356,6 +357,80 @@ export default function App() {
     }
   }
 
+  const handleSuggestFrequenters = async (location: LocationData) => {
+      if (!checkApiKey()) return;
+      setIsLoading(true);
+      try {
+          const suggestions = await suggestFrequenters(location, worldState, apiKey);
+          if (suggestions.length === 0) {
+              alert("A IA não encontrou nenhum NPC existente que se encaixe perfeitamente. Tente adicionar manualmente.");
+              return;
+          }
+          // Merge logic: Add suggested names to existing list, avoid duplicates
+          const currentList = new Set(location.frequenters || []);
+          suggestions.forEach(name => currentList.add(name));
+          
+          const updatedLoc = {
+              ...location,
+              frequenters: Array.from(currentList)
+          };
+          handleUpdateEntity({ type: EntityType.LOCATION, data: updatedLoc });
+          alert(`${suggestions.length} frequentadores existentes foram sugeridos e adicionados.`);
+      } catch (e) {
+          console.error(e);
+          alert("Erro ao sugerir frequentadores.");
+      } finally {
+          setIsLoading(false);
+      }
+  }
+
+  const handleGenerateLocationFrequenters = async (location: LocationData, type: 'MORTAL' | 'VAMPIRE' | 'GHOUL') => {
+      if (!checkApiKey()) return;
+      setIsLoading(true);
+      try {
+          const newNpcs = await generateLocationFrequenters(location, type, worldState, apiKey);
+          const npcsWithIds = newNpcs.map(n => ({ ...n, id: crypto.randomUUID() }));
+          
+          setWorldState(prev => ({
+              ...prev,
+              npcs: [...npcsWithIds, ...prev.npcs]
+          }));
+
+          // Optionally link them to the location in local state for display if needed
+          const updatedLoc = {
+              ...location,
+              frequenters: [...(location.frequenters || []), ...npcsWithIds.map(n => n.name)]
+          };
+          handleUpdateEntity({ type: EntityType.LOCATION, data: updatedLoc });
+          
+          alert(`${npcsWithIds.length} frequentadores (${type}) foram criados e adicionados ao Grimório.`);
+      } catch (e) {
+          console.error(e);
+          alert("Erro ao gerar frequentadores.");
+      } finally {
+          setIsLoading(false);
+      }
+  }
+
+  const handleGenerateMinion = async (npc: NpcData, type: 'GHOUL' | 'RETAINER' | 'CHILD') => {
+      if (!checkApiKey()) return;
+      setIsLoading(true);
+      try {
+          const minion = await generateNpcMinion(npc, type, worldState, apiKey);
+          const minionWithId = { ...minion, id: crypto.randomUUID() };
+           setWorldState(prev => ({
+              ...prev,
+              npcs: [minionWithId, ...prev.npcs]
+          }));
+          alert(`${minion.name} (${type}) foi criado.`);
+      } catch (e) {
+          console.error(e);
+          alert("Erro ao gerar lacaio.");
+      } finally {
+          setIsLoading(false);
+      }
+  }
+
   const handleUpgradeNpcProfile = async (npc: NpcData) => {
     if (!checkApiKey()) return;
     setIsLoading(true);
@@ -531,6 +606,10 @@ export default function App() {
                 onUpgradeProfile={handleUpgradeNpcProfile}
                 onApplyAdjustment={handleWorldAdjustment}
                 onHarmonizeNpc={handleHarmonizeNpc}
+                onGenerateLocationFrequenters={handleGenerateLocationFrequenters}
+                onGenerateMinion={handleGenerateMinion}
+                onSuggestFrequenters={handleSuggestFrequenters}
+                npcList={worldState.npcs}
                 apiKey={apiKey}
               />
             </div>
@@ -570,6 +649,10 @@ export default function App() {
                   onUpgradeProfile={handleUpgradeNpcProfile}
                   onApplyAdjustment={handleWorldAdjustment}
                   onHarmonizeNpc={handleHarmonizeNpc}
+                  onGenerateLocationFrequenters={handleGenerateLocationFrequenters}
+                  onGenerateMinion={handleGenerateMinion}
+                  onSuggestFrequenters={handleSuggestFrequenters}
+                  npcList={worldState.npcs}
                   apiKey={apiKey}
                 />
               </div>

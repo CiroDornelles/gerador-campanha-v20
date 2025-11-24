@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { NpcData, FactionData, LocationData, EntityType, GeneratedEntity, Rumor } from '../types';
 import { IconSkull, IconMap, IconUsers, IconRefresh, IconSpinner, IconNetwork, IconPlus, IconMagic, IconBriefcase, IconDownload, IconEye, IconX } from './Icons';
@@ -107,6 +108,7 @@ export const NpcCard = ({
   onRegenerateImage, 
   onUpgradeProfile,
   onHarmonize,
+  onGenerateMinion,
   isImageLoading,
   isLoading,
   apiKey
@@ -116,6 +118,7 @@ export const NpcCard = ({
   onRegenerateImage: () => void, 
   onUpgradeProfile: (n: NpcData) => void,
   onHarmonize?: (n: NpcData) => Promise<NpcData | null>,
+  onGenerateMinion?: (n: NpcData, type: 'GHOUL' | 'RETAINER' | 'CHILD') => void,
   isImageLoading: boolean,
   isLoading: boolean,
   apiKey: string
@@ -223,6 +226,17 @@ export const NpcCard = ({
                <button onClick={() => onUpgradeProfile(data)} disabled={isLoading} className="btn-press w-full mt-4 py-2 bg-purple-900 text-white rounded shadow hover:bg-purple-800 transition-colors uppercase text-xs tracking-widest font-bold flex justify-center items-center gap-2">
                    {isLoading ? <IconSpinner /> : <IconPlus />} Atualizar Perfil (V2)
                </button>
+            )}
+
+            {onGenerateMinion && (
+                <div className="mt-4 pt-4 border-t border-gray-300">
+                    <h4 className="font-bold font-serif uppercase text-xs tracking-widest mb-2 text-gray-600">Criar Lacaios</h4>
+                    <div className="flex gap-2">
+                        <button onClick={() => onGenerateMinion(data, 'GHOUL')} disabled={isLoading} className="btn-press flex-1 py-1.5 bg-gray-800 text-white rounded text-xs uppercase hover:bg-blood transition-colors">Ghoul</button>
+                        <button onClick={() => onGenerateMinion(data, 'RETAINER')} disabled={isLoading} className="btn-press flex-1 py-1.5 bg-gray-800 text-white rounded text-xs uppercase hover:bg-blood transition-colors">Mortal</button>
+                        <button onClick={() => onGenerateMinion(data, 'CHILD')} disabled={isLoading} className="btn-press flex-1 py-1.5 bg-gray-800 text-white rounded text-xs uppercase hover:bg-blood transition-colors">Cria</button>
+                    </div>
+                </div>
             )}
 
             {data.relationships && (
@@ -458,9 +472,30 @@ export const FactionCard = ({
 };
 
 // --- Location Card ---
-export const LocationCard = ({ data, onUpdate, onRegenerateImage, isImageLoading, apiKey }: { data: LocationData, onUpdate: (d: LocationData) => void, onRegenerateImage: () => void, isImageLoading: boolean, apiKey: string }) => {
+export const LocationCard = ({ 
+  data, 
+  onUpdate, 
+  onRegenerateImage, 
+  onGenerateFrequenters,
+  onSuggestFrequenters,
+  npcList,
+  isImageLoading,
+  isLoading, 
+  apiKey 
+}: { 
+  data: LocationData, 
+  onUpdate: (d: LocationData) => void, 
+  onRegenerateImage: () => void, 
+  onGenerateFrequenters?: (l: LocationData, type: 'MORTAL' | 'VAMPIRE' | 'GHOUL') => void,
+  onSuggestFrequenters?: (l: LocationData) => void,
+  npcList?: NpcData[],
+  isImageLoading: boolean,
+  isLoading?: boolean,
+  apiKey: string 
+}) => {
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState(data);
+  const [selectedExistingNpc, setSelectedExistingNpc] = useState("");
 
   useEffect(() => { setFormData(data); }, [data]);
 
@@ -468,6 +503,24 @@ export const LocationCard = ({ data, onUpdate, onRegenerateImage, isImageLoading
     onUpdate(formData);
     setIsEditing(false);
   };
+
+  const handleAddExisting = () => {
+      if (!selectedExistingNpc) return;
+      const current = formData.frequenters || [];
+      if (!current.includes(selectedExistingNpc)) {
+          const updated = { ...formData, frequenters: [...current, selectedExistingNpc] };
+          setFormData(updated);
+          onUpdate(updated);
+      }
+      setSelectedExistingNpc("");
+  }
+
+  const handleRemoveFrequenter = (name: string) => {
+      const current = formData.frequenters || [];
+      const updated = { ...formData, frequenters: current.filter(f => f !== name) };
+      setFormData(updated);
+      onUpdate(updated);
+  }
 
   return (
     <div className="bg-black border border-gray-800 p-0 rounded-lg shadow-lg overflow-hidden flex flex-col relative transition-all hover:shadow-[0_0_20px_rgba(0,0,0,0.5)]">
@@ -494,7 +547,7 @@ export const LocationCard = ({ data, onUpdate, onRegenerateImage, isImageLoading
             <div className="p-8 md:w-2/3 animate-fade-in-up" style={{ animationDelay: '100ms' }}>
                <h4 className="font-serif text-gray-400 mb-2 uppercase tracking-widest text-xs">Descrição & Atmosfera</h4>
                <p className="text-gray-300 text-sm leading-relaxed mb-6 whitespace-pre-line">{data.description}</p>
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                   <div className="bg-gray-900 p-4 rounded border border-gray-800 transition-colors hover:border-gray-700">
                     <h5 className="text-blood text-xs uppercase font-bold mb-1">Atmosfera</h5>
                     <p className="text-gray-400 text-sm">{data.atmosphere}</p>
@@ -503,6 +556,71 @@ export const LocationCard = ({ data, onUpdate, onRegenerateImage, isImageLoading
                     <h5 className="text-blood text-xs uppercase font-bold mb-1">Segurança</h5>
                     <p className="text-gray-400 text-sm">{data.security}</p>
                   </div>
+               </div>
+
+               <div className="border-t border-gray-800 pt-4">
+                    <h4 className="font-serif text-gray-400 mb-2 uppercase tracking-widest text-xs flex items-center gap-2"><IconUsers /> Gerenciar Frequentadores</h4>
+                    
+                    {/* Current Frequenters List */}
+                    {data.frequenters && data.frequenters.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mb-4">
+                            {data.frequenters.map((freq, i) => (
+                                <span key={i} className="flex items-center gap-1 bg-gray-800 text-gray-200 px-2 py-1 text-xs rounded border border-gray-700 group">
+                                    {freq}
+                                    <button onClick={() => handleRemoveFrequenter(freq)} className="text-gray-500 hover:text-red-500 ml-1"><IconX /></button>
+                                </span>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* Management Controls */}
+                    <div className="space-y-3">
+                         {/* 1. Add Existing / AI Suggest */}
+                         <div className="bg-gray-900/50 p-3 rounded border border-gray-700">
+                             <p className="text-[10px] text-gray-500 uppercase mb-2">Adicionar Existente</p>
+                             <div className="flex gap-2 mb-2">
+                                <select 
+                                    value={selectedExistingNpc} 
+                                    onChange={(e) => setSelectedExistingNpc(e.target.value)}
+                                    className="flex-1 bg-gray-800 border border-gray-600 text-white text-xs rounded p-1.5 focus:border-blood focus:outline-none"
+                                >
+                                    <option value="">Selecione um NPC...</option>
+                                    {npcList?.map(n => (
+                                        <option key={n.id} value={n.name}>{n.name} ({n.clan})</option>
+                                    ))}
+                                </select>
+                                <button onClick={handleAddExisting} disabled={!selectedExistingNpc} className="bg-gray-700 hover:bg-gray-600 text-white px-3 rounded text-xs"><IconPlus /></button>
+                             </div>
+                             
+                             {onSuggestFrequenters && (
+                                 <button 
+                                     onClick={() => onSuggestFrequenters(data)} 
+                                     disabled={isLoading} 
+                                     className="w-full py-1.5 bg-purple-900/40 border border-purple-500/50 hover:bg-purple-900/60 text-purple-200 rounded text-xs uppercase tracking-wider flex justify-center items-center gap-2 transition-colors"
+                                 >
+                                    {isLoading ? <IconSpinner /> : <IconMagic />} IA Sugerir (Baseado em Lore)
+                                 </button>
+                             )}
+                         </div>
+
+                         {/* 2. Generate New (Secondary) */}
+                         {onGenerateFrequenters && (
+                            <div className="mt-2 opacity-80 hover:opacity-100 transition-opacity">
+                                <p className="text-[10px] text-gray-600 uppercase mb-1">Ou Criar Novos (Desconhecidos)</p>
+                                <div className="flex gap-2">
+                                    <button onClick={() => onGenerateFrequenters(data, 'MORTAL')} disabled={isLoading} className="flex-1 py-1.5 bg-black border border-gray-800 hover:border-gray-500 text-gray-500 hover:text-white rounded text-[10px] uppercase tracking-widest transition-colors">
+                                        Mortais
+                                    </button>
+                                    <button onClick={() => onGenerateFrequenters(data, 'VAMPIRE')} disabled={isLoading} className="flex-1 py-1.5 bg-black border border-gray-800 hover:border-gray-500 text-gray-500 hover:text-white rounded text-[10px] uppercase tracking-widest transition-colors">
+                                        Vampiros
+                                    </button>
+                                    <button onClick={() => onGenerateFrequenters(data, 'GHOUL')} disabled={isLoading} className="flex-1 py-1.5 bg-black border border-gray-800 hover:border-gray-500 text-gray-500 hover:text-white rounded text-[10px] uppercase tracking-widest transition-colors">
+                                        Ghouls
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
                </div>
             </div>
           </>
@@ -518,6 +636,7 @@ export const LocationCard = ({ data, onUpdate, onRegenerateImage, isImageLoading
                <InputField label="Atmosfera" value={formData.atmosphere} onChange={v => setFormData({...formData, atmosphere: v})} />
                <InputField label="Segurança" value={formData.security} onChange={v => setFormData({...formData, security: v})} />
              </div>
+             <ArrayField label="Frequentadores (Lista Manual)" values={formData.frequenters || []} onChange={v => setFormData({...formData, frequenters: v})} />
           </div>
         )}
       </div>
@@ -537,6 +656,10 @@ export const DisplayCard = ({
   onGenerateImage,
   onUpgradeProfile,
   onHarmonizeNpc,
+  onGenerateLocationFrequenters,
+  onSuggestFrequenters,
+  onGenerateMinion,
+  npcList,
   isLoading,
   isImageLoading,
   apiKey
@@ -551,17 +674,21 @@ export const DisplayCard = ({
   onGenerateImage: (e: GeneratedEntity) => void,
   onUpgradeProfile: (n: NpcData) => void,
   onHarmonizeNpc?: (n: NpcData) => Promise<NpcData | null>,
+  onGenerateLocationFrequenters?: (l: LocationData, type: 'MORTAL' | 'VAMPIRE' | 'GHOUL') => void,
+  onSuggestFrequenters?: (l: LocationData) => void,
+  onGenerateMinion?: (n: NpcData, type: 'GHOUL' | 'RETAINER' | 'CHILD') => void,
+  npcList?: NpcData[],
   isLoading: boolean,
   isImageLoading: boolean,
   apiKey: string
 }) => {
   switch (entity.type) {
     case EntityType.NPC:
-      return <NpcCard data={entity.data} onUpdate={(d) => onUpdate({...entity, data: d})} onRegenerateImage={() => onGenerateImage(entity)} onUpgradeProfile={onUpgradeProfile} onHarmonize={onHarmonizeNpc} isImageLoading={isImageLoading} isLoading={isLoading} apiKey={apiKey} />;
+      return <NpcCard data={entity.data} onUpdate={(d) => onUpdate({...entity, data: d})} onRegenerateImage={() => onGenerateImage(entity)} onUpgradeProfile={onUpgradeProfile} onHarmonize={onHarmonizeNpc} onGenerateMinion={onGenerateMinion} isImageLoading={isImageLoading} isLoading={isLoading} apiKey={apiKey} />;
     case EntityType.FACTION:
       return <FactionCard data={entity.data} onUpdate={(d) => onUpdate({...entity, data: d})} onGenerateMap={onGenerateMap} onGenerateMembers={onGenerateMembers} onGenerateLocations={onGenerateLocations} onGenerateResources={onGenerateResources} onApplyAdjustment={onApplyAdjustment} isLoading={isLoading} onRegenerateImage={() => onGenerateImage(entity)} isImageLoading={isImageLoading} apiKey={apiKey} />;
     case EntityType.LOCATION:
-      return <LocationCard data={entity.data} onUpdate={(d) => onUpdate({...entity, data: d})} onRegenerateImage={() => onGenerateImage(entity)} isImageLoading={isImageLoading} apiKey={apiKey} />;
+      return <LocationCard data={entity.data} onUpdate={(d) => onUpdate({...entity, data: d})} onRegenerateImage={() => onGenerateImage(entity)} onGenerateFrequenters={onGenerateLocationFrequenters} onSuggestFrequenters={onSuggestFrequenters} npcList={npcList} isImageLoading={isImageLoading} isLoading={isLoading} apiKey={apiKey} />;
     default:
       return null;
   }

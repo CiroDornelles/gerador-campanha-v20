@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { EntityType, WorldContextState, NpcData, FactionData, LocationData, RelationshipMapData, AdjustmentResult } from "../types";
 
@@ -143,6 +144,19 @@ const adjustmentSchema: Schema = {
     summary: { type: Type.STRING, description: "Resumo curto das mudanças realizadas." }
   },
   required: ["updatedNpcs", "updatedFactions", "updatedLocations", "summary"]
+};
+
+const frequenterSuggestionSchema: Schema = {
+    type: Type.OBJECT,
+    properties: {
+        suggestedNpcNames: { 
+            type: Type.ARRAY, 
+            items: { type: Type.STRING }, 
+            description: "Lista com os NOMES exatos dos NPCs existentes que deveriam frequentar este local." 
+        },
+        reasoning: { type: Type.STRING, description: "Breve explicação do porquê." }
+    },
+    required: ["suggestedNpcNames"]
 };
 
 // --- Helper to serialize world state SAFELY (No Images) ---
@@ -483,6 +497,143 @@ export const generateFactionResources = async (
     throw error;
   }
 }
+
+export const suggestFrequenters = async (
+    location: LocationData,
+    worldState: WorldContextState,
+    apiKey: string
+): Promise<string[]> => {
+    const ai = getClient(apiKey);
+    const worldContext = serializeWorldState(worldState);
+
+    const systemInstruction = `Você é um Narrador de V20.
+    Sua tarefa é analisar os NPCs existentes na crônica e sugerir quais deles frequentariam este local.
+    Baseie-se no Clã, Alianças, História e Personalidade.
+    Se o local for dos Gangrel, sugira Gangrels. Se for um Elysium, sugira Anciões.
+    Use Português do Brasil.
+    
+    ESTADO DO MUNDO (JSON):
+    ${worldContext}`;
+
+    const prompt = `Local: "${location.name}" (${location.type}).
+    Descrição: ${location.description}.
+    Controlado por: ${location.controlledBy}.
+    
+    Retorne uma lista contendo APENAS os nomes exatos dos NPCs existentes que fariam sentido frequentar este local.`;
+
+    try {
+        const response = await ai.models.generateContent({
+            model: MODEL_NAME,
+            contents: prompt,
+            config: {
+                systemInstruction: systemInstruction,
+                responseMimeType: "application/json",
+                responseSchema: frequenterSuggestionSchema,
+                temperature: 0.7, // Lower temp for more analytical matching
+            }
+        });
+
+        const text = response.text;
+        if (!text) throw new Error("Sem resposta da IA");
+        const json = JSON.parse(text);
+        return json.suggestedNpcNames || [];
+    } catch (e) {
+        console.error("Frequenter Suggestion Error", e);
+        return []; // Fail graceful
+    }
+}
+
+export const generateLocationFrequenters = async (
+    location: LocationData,
+    type: 'MORTAL' | 'VAMPIRE' | 'GHOUL',
+    worldState: WorldContextState,
+    apiKey: string
+): Promise<NpcData[]> => {
+    const ai = getClient(apiKey);
+    const worldContext = serializeWorldState(worldState);
+
+    const systemInstruction = `Você é um Narrador de V20.
+    Sua tarefa é criar NPCs (fichas completas) que frequentam um local específico.
+    Se forem Mortais, foque em seus papéis (Barman, Segurança, Cliente VIP).
+    Se forem Vampiros, crie membros que usam o local para caça ou política.
+    Se forem Ghouls, crie servos do dono do local.
+    Use Português do Brasil.
+    
+    ESTADO DO MUNDO (JSON):
+    ${worldContext}`;
+
+    const prompt = `Gere 3 NPCs do tipo ${type} que frequentam o local: "${location.name}" (${location.type}).
+    Descrição do Local: ${location.description}.
+    Controlado por: ${location.controlledBy}.
+    
+    Os NPCs devem ter conexões com este local em sua história.`;
+
+    try {
+        const response = await ai.models.generateContent({
+            model: MODEL_NAME,
+            contents: prompt,
+            config: {
+                systemInstruction: systemInstruction,
+                responseMimeType: "application/json",
+                responseSchema: multiNpcSchema,
+                temperature: 0.85,
+            }
+        });
+
+        const text = response.text;
+        if (!text) throw new Error("Sem resposta da IA");
+        return JSON.parse(text) as NpcData[];
+    } catch (e) {
+        console.error("Location Frequenters Generation Error", e);
+        throw e;
+    }
+}
+
+export const generateNpcMinion = async (
+    npc: NpcData,
+    type: 'GHOUL' | 'RETAINER' | 'CHILD',
+    worldState: WorldContextState,
+    apiKey: string
+): Promise<NpcData> => {
+    const ai = getClient(apiKey);
+    const worldContext = serializeWorldState(worldState);
+
+    const systemInstruction = `Você é um Narrador de V20.
+    Sua tarefa é criar um NPC subordinado (Lacaio, Ghoul ou Cria) para um NPC existente.
+    Este novo NPC deve ser leal (ou secretamente ressentido) ao seu mestre.
+    Use Português do Brasil.
+    
+    ESTADO DO MUNDO (JSON):
+    ${worldContext}`;
+
+    const typeDesc = type === 'CHILD' ? 'Cria (Vampiro recém abraçado por ele)' : type === 'GHOUL' ? 'Ghoul (Servo de Sangue)' : 'Lacaio Mortal';
+
+    const prompt = `Gere um NPC do tipo ${typeDesc} para o mestre: "${npc.name}" (${npc.clan}).
+    História do Mestre: ${npc.history}.
+    
+    O novo NPC deve ter sua história entrelaçada com a do mestre.`;
+
+    try {
+        const response = await ai.models.generateContent({
+            model: MODEL_NAME,
+            contents: prompt,
+            config: {
+                systemInstruction: systemInstruction,
+                responseMimeType: "application/json",
+                responseSchema: npcSchema,
+                temperature: 0.85,
+            }
+        });
+
+        const text = response.text;
+        if (!text) throw new Error("Sem resposta da IA");
+        return JSON.parse(text) as NpcData;
+    } catch (e) {
+        console.error("Minion Generation Error", e);
+        throw e;
+    }
+}
+
 
 export const applyWorldAdjustment = async (
   instruction: string,

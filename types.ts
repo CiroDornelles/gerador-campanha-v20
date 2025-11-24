@@ -72,6 +72,7 @@ export interface LocationData {
   atmosphere: string;
   security: string;
   description: string;
+  frequenters?: string[]; // New field for generated NPCs who hang out here
   imageUrl?: string;
 }
 
