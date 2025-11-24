@@ -1,0 +1,43 @@
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+::-webkit-scrollbar-track {
+    background: #0f0f0f; 
+}
+::-webkit-scrollbar-thumb {
+    background: #333; 
+    border-radius: 4px;
+    border: 1px solid #1a1a1a;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #8a0303; 
+}
+
+/* Utility Classes */
+.btn-press {
+    transition: transform 0.1s ease-in-out, background-color 0.2s, box-shadow 0.2s;
+    cursor: pointer;
+}
+.btn-press:active {
+    transform: scale(0.96);
+}
+
+.card-hover {
+    transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), box-shadow 0.3s, border-color 0.3s;
+}
+.card-hover:hover {
+    transform: translateY(-4px);
+}
+
+/* Animation Utilities */
+.animate-fade-in-up {
+    animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
