@@ -1,13 +1,13 @@
 
-import { NpcData, WorldContextState } from "../types";
+import { NpcData, WorldContextState, V20Stats } from "../types";
+import { generateV20Stats } from "./v20Rules";
 
 // Helper to sanitize filename
 const sanitizeFilename = (name: string) => name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
 
-// Helper to map clan names to WoD System keys (best effort)
+// Helper to map clan names to WoD System keys
 const mapClanToSystemKey = (clanName: string): string => {
     const clean = clanName.toLowerCase().trim();
-    // Common mappings based on WoD system keys
     const map: Record<string, string> = {
         "assamite": "wod.bio.vampire.assamite",
         "assamita": "wod.bio.vampire.assamite",
@@ -30,14 +30,11 @@ const mapClanToSystemKey = (clanName: string): string => {
         "ventrue": "wod.bio.vampire.ventrue"
     };
     
-    // Attempt partial match if exact match fails
     if (map[clean]) return map[clean];
-    
     for (const key in map) {
         if (clean.includes(key)) return map[key];
     }
-
-    return "wod.bio.vampire.caitiff"; // Default fallback
+    return "wod.bio.vampire.caitiff";
 };
 
 const detectCreatureType = (clan: string): 'VAMPIRE' | 'GHOUL' | 'MORTAL' => {
@@ -48,31 +45,27 @@ const detectCreatureType = (clan: string): 'VAMPIRE' | 'GHOUL' | 'MORTAL' => {
     return 'VAMPIRE';
 };
 
-const generateActorData = (npc: NpcData): any => {
+export const generateFoundryActorData = (npc: NpcData) => {
     const creatureType = detectCreatureType(npc.clan);
+    
+    // USE EXISTING STATS OR GENERATE NEW
+    const stats: V20Stats = npc.stats ? npc.stats : generateV20Stats(npc);
 
-    // --- 1. Construct HTML Biography (for system.background) ---
+    // --- Construct Foundry JSON ---
+
     let bioHtml = ``;
-    
     if (npc.quote) bioHtml += `<p><i>"${npc.quote}"</i></p><hr>`;
-    
     bioHtml += `<h2>História</h2><p>${npc.history.replace(/\n\n/g, '</p><p>')}</p>`;
-
+    if (npc.concept) bioHtml += `<p><b>Conceito:</b> ${npc.concept}</p>`;
     if (npc.parents) bioHtml += `<p><b>Pais Mortais:</b> ${npc.parents}</p>`;
     if (npc.birthDate) bioHtml += `<p><b>Nascimento:</b> ${npc.birthDate}</p>`;
     if (npc.embraceDate && creatureType === 'VAMPIRE') bioHtml += `<p><b>Abraço:</b> ${npc.embraceDate}</p>`;
-
-    // Psychology Section
+    
     bioHtml += `<h2>Psicologia</h2>`;
-    if (npc.likes && npc.likes.length > 0) {
-        bioHtml += `<p><b>Gosta:</b> ${npc.likes.join(', ')}</p>`;
-    }
-    if (npc.dislikes && npc.dislikes.length > 0) {
-        bioHtml += `<p><b>Não Gosta:</b> ${npc.dislikes.join(', ')}</p>`;
-    }
-
-    // Rumors Section
-    if (npc.rumors && npc.rumors.length > 0) {
+    if (npc.likes?.length) bioHtml += `<p><b>Gosta:</b> ${npc.likes.join(', ')}</p>`;
+    if (npc.dislikes?.length) bioHtml += `<p><b>Não Gosta:</b> ${npc.dislikes.join(', ')}</p>`;
+    
+    if (npc.rumors?.length) {
         bioHtml += `<h2>Rumores</h2><ul>`;
         npc.rumors.forEach(r => {
             const color = r.status === 'VERDADEIRO' ? '#4ade80' : r.status === 'FALSO' ? '#f87171' : '#facc15';
@@ -80,13 +73,11 @@ const generateActorData = (npc: NpcData): any => {
         });
         bioHtml += `</ul>`;
     }
-
-    // Connections
-    if (npc.relationships && npc.relationships.length > 0) {
+    if (npc.relationships?.length) {
         bioHtml += `<h2>Conexões</h2><ul><li>${npc.relationships.join('</li><li>')}</li></ul>`;
     }
 
-    // --- 2. Create Items (Influence as Backgrounds) ---
+    // Build Items (Backgrounds)
     const items: any[] = [];
     if (npc.influence) {
         npc.influence.forEach(inf => {
@@ -96,7 +87,7 @@ const generateActorData = (npc: NpcData): any => {
                 img: "systems/worldofdarkness/assets/img/items/feature.svg",
                 system: {
                     type: "wod.types.background",
-                    value: 1, // Default dot
+                    value: 1,
                     max: 5,
                     iscreated: true,
                     isvisible: true,
@@ -105,114 +96,103 @@ const generateActorData = (npc: NpcData): any => {
             });
         });
     }
-
-    // Parse Generation (only relevant for Vampires)
+    // Add Generation Background if needed
     const genMatch = npc.generation.match(/\d+/);
     const generation = genMatch ? parseInt(genMatch[0]) : 13;
-    
-    // Calculate max blood pool
-    // Vampires: Gen based. Ghouls: Usually 10 (limited by body size).
-    let maxBlood = 10;
-    if (creatureType === 'VAMPIRE') {
-        maxBlood = generation > 13 ? 10 : (10 + (13 - generation));
+    if (creatureType === 'VAMPIRE' && generation < 13) {
+        items.push({
+            name: "Geração",
+            type: "Feature",
+            img: "systems/worldofdarkness/assets/img/items/feature.svg",
+            system: { type: "wod.types.background", value: 13 - generation, max: 5 }
+        });
     }
 
-    // --- 3. Build the Actor JSON Structure ---
-    
     const baseSystem = {
-        // Narrative Fields
-        background: bioHtml, // Main Bio
-        appearance: npc.appearance || "", // Appearance field
+        background: bioHtml,
+        appearance: npc.appearance || "",
         notes: "",
-
-        // Default Attributes Structure (V20)
         attributes: {
-            strength: { value: 2, max: 5, type: "physical", label: "wod.attributes.strength", isvisible: true },
-            dexterity: { value: 2, max: 5, type: "physical", label: "wod.attributes.dexterity", isvisible: true },
-            stamina: { value: 2, max: 5, type: "physical", label: "wod.attributes.stamina", isvisible: true },
-            charisma: { value: 2, max: 5, type: "social", label: "wod.attributes.charisma", isvisible: true },
-            manipulation: { value: 2, max: 5, type: "social", label: "wod.attributes.manipulation", isvisible: true },
-            appearance: { value: 2, max: 5, type: "social", label: "wod.attributes.appearance", isvisible: true },
-            perception: { value: 2, max: 5, type: "mental", label: "wod.attributes.perception", isvisible: true },
-            intelligence: { value: 2, max: 5, type: "mental", label: "wod.attributes.intelligence", isvisible: true },
-            wits: { value: 2, max: 5, type: "mental", label: "wod.attributes.wits", isvisible: true },
+            strength: { value: stats.attributes.strength, max: 5, type: "physical", label: "wod.attributes.strength", isvisible: true },
+            dexterity: { value: stats.attributes.dexterity, max: 5, type: "physical", label: "wod.attributes.dexterity", isvisible: true },
+            stamina: { value: stats.attributes.stamina, max: 5, type: "physical", label: "wod.attributes.stamina", isvisible: true },
+            charisma: { value: stats.attributes.charisma, max: 5, type: "social", label: "wod.attributes.charisma", isvisible: true },
+            manipulation: { value: stats.attributes.manipulation, max: 5, type: "social", label: "wod.attributes.manipulation", isvisible: true },
+            appearance: { value: stats.attributes.appearance, max: 5, type: "social", label: "wod.attributes.appearance", isvisible: true },
+            perception: { value: stats.attributes.perception, max: 5, type: "mental", label: "wod.attributes.perception", isvisible: true },
+            intelligence: { value: stats.attributes.intelligence, max: 5, type: "mental", label: "wod.attributes.intelligence", isvisible: true },
+            wits: { value: stats.attributes.wits, max: 5, type: "mental", label: "wod.attributes.wits", isvisible: true },
         },
-        
-        // Essential Advantages
+        abilities: {
+            ...Object.entries(stats.abilities).reduce((acc, [key, val]) => {
+                // @ts-ignore
+                acc[key] = { value: val, max: 5, label: `wod.abilities.${key}`, isvisible: val > 0 };
+                return acc;
+            }, {})
+        },
         advantages: {
-            willpower: { permanent: 5, temporary: 5, max: 10, roll: 5, label: "wod.advantages.willpower" },
-            bloodpool: { max: maxBlood, temporary: Math.floor(maxBlood / 2), perturn: 1 },
+            willpower: { permanent: stats.willpower, temporary: stats.willpower, max: 10, roll: stats.willpower, label: "wod.advantages.willpower" },
+            bloodpool: { max: stats.bloodpool, temporary: Math.floor(stats.bloodpool / 2), perturn: 1 },
             virtues: {
-                conscience: { permanent: 2, max: 5, roll: 2, label: "wod.advantages.virtue.conscience" },
-                selfcontrol: { permanent: 2, max: 5, roll: 2, label: "wod.advantages.virtue.selfcontrol" },
-                courage: { permanent: 2, max: 5, roll: 2, label: "wod.advantages.virtue.courage" }
+                conscience: { permanent: stats.virtues.conscience, max: 5, roll: stats.virtues.conscience, label: "wod.advantages.virtue.conscience" },
+                selfcontrol: { permanent: stats.virtues.selfcontrol, max: 5, roll: stats.virtues.selfcontrol, label: "wod.advantages.virtue.selfcontrol" },
+                courage: { permanent: stats.virtues.courage, max: 5, roll: stats.virtues.courage, label: "wod.advantages.virtue.courage" }
             },
-            path: {
-                permanent: 7, // Default Humanity
-                label: "wod.advantages.path.humanity"
-            }
+            path: { permanent: stats.humanity, label: "wod.advantages.path.humanity" }
         },
     };
 
-    let foundryActor: any = {};
+    let actorData: any = {
+        name: npc.name,
+        img: npc.imageUrl || "icons/svg/mystery-man.svg",
+        flags: { exportSource: "V20 Storyteller Assistant" },
+        items: items
+    };
 
     if (creatureType === 'VAMPIRE') {
-        // --- VAMPIRE STRUCTURE ---
-        foundryActor = {
+        actorData.type = "Vampire";
+        actorData.system = {
+            ...baseSystem,
             name: npc.name,
-            type: "Vampire",
-            img: npc.imageUrl || "icons/svg/mystery-man.svg",
-            system: {
-                ...baseSystem,
-                name: npc.name,
-                nature: npc.nature,
-                demeanor: npc.demeanor,
-                generation: generation,
-                sire: npc.sire,
-                clan: mapClanToSystemKey(npc.clan),
-                custom: { clan: npc.clan },
-                settings: {
-                    iscreated: true,
-                    version: "5.0.12",
-                    era: "wod.era.modern",
-                    hasbloodpool: true,
-                    haswillpower: true,
-                    hasvirtue: true
-                }
+            nature: npc.nature,
+            demeanor: npc.demeanor,
+            concept: npc.concept || "",
+            generation: generation,
+            sire: npc.sire,
+            clan: mapClanToSystemKey(npc.clan),
+            custom: { clan: npc.clan },
+            settings: {
+                iscreated: true,
+                version: "5.0.12",
+                era: "wod.era.modern",
+                hasbloodpool: true,
+                haswillpower: true,
+                hasvirtue: true
             }
         };
     } else {
-        // --- GHOUL / MORTAL STRUCTURE ---
-        foundryActor = {
+        actorData.type = "Mortal";
+        actorData.system = {
+            ...baseSystem,
             name: npc.name,
-            type: "Mortal", // Ghouls are Mortals in this system with variant settings
-            img: npc.imageUrl || "icons/svg/mystery-man.svg",
-            system: {
-                ...baseSystem,
-                name: npc.name,
-                nature: npc.nature,
-                demeanor: npc.demeanor,
-                concept: npc.clan, // Use clan field as Concept/Job for mortals
-                settings: {
-                    iscreated: true,
-                    version: "5.0.12",
-                    era: "wod.era.modern",
-                    variant: creatureType === 'GHOUL' ? "ghoul" : "general",
-                    variantsheet: creatureType === 'GHOUL' ? "Vampire" : "", // Ghouls use Vampire-like sheet
-                    hasbloodpool: creatureType === 'GHOUL', // Only ghouls need blood
-                    hasdisciplines: creatureType === 'GHOUL',
-                    haswillpower: true,
-                    hasvirtue: true
-                }
+            nature: npc.nature,
+            demeanor: npc.demeanor,
+            concept: npc.concept || npc.clan,
+            settings: {
+                iscreated: true,
+                version: "5.0.12",
+                era: "wod.era.modern",
+                variant: creatureType === 'GHOUL' ? "ghoul" : "general",
+                variantsheet: creatureType === 'GHOUL' ? "Vampire" : "",
+                hasbloodpool: creatureType === 'GHOUL',
+                hasdisciplines: creatureType === 'GHOUL',
+                haswillpower: true,
+                hasvirtue: true
             }
         };
     }
 
-    // Attach Items and Flags
-    foundryActor.items = items;
-    foundryActor.flags = { exportSource: "V20 Storyteller Assistant" };
-
-    return foundryActor;
+    return actorData;
 };
 
 const downloadJson = (filename: string, data: any) => {
@@ -229,7 +209,7 @@ const downloadJson = (filename: string, data: any) => {
 
 export const exportNpcToFoundry = (npc: NpcData) => {
     try {
-        const actorData = generateActorData(npc);
+        const actorData = generateFoundryActorData(npc);
         downloadJson(`${sanitizeFilename(npc.name)}.json`, actorData);
     } catch (e) {
         console.error("Foundry Export Error", e);
@@ -239,18 +219,28 @@ export const exportNpcToFoundry = (npc: NpcData) => {
 
 export const exportBundleToFoundry = (master: NpcData, worldState: WorldContextState) => {
     try {
-        const actors = [generateActorData(master)];
-        
+        const mainData = generateFoundryActorData(master);
+        const minionsData: { name: string, data: any }[] = [];
+
         if (master.minions && master.minions.length > 0) {
             master.minions.forEach(minionName => {
-                const minion = worldState.npcs.find(n => n.name === minionName);
-                if (minion) {
-                    actors.push(generateActorData(minion));
+                const minionNpc = worldState.npcs.find(n => n.name === minionName);
+                if (minionNpc) {
+                    minionsData.push({
+                        name: minionNpc.name,
+                        data: generateFoundryActorData(minionNpc)
+                    });
                 }
             });
         }
+
+        const bundle = {
+            rootName: master.name,
+            mainActor: mainData,
+            minions: minionsData
+        };
         
-        downloadJson(`bundle_${sanitizeFilename(master.name)}.json`, { actors });
+        downloadJson(`bundle_${sanitizeFilename(master.name)}.json`, bundle);
     } catch (e) {
         console.error("Bundle Export Error", e);
         alert("Erro ao exportar pacote.");
@@ -258,59 +248,66 @@ export const exportBundleToFoundry = (master: NpcData, worldState: WorldContextS
 };
 
 export const FOUNDRY_IMPORT_MACRO = `/**
- * Macro to import Bundle JSON from V20 Storyteller Assistant
- * Supports single Actor JSON or Bundle { actors: [] } JSON
+ * V20 Storyteller Assistant - Import Macro
+ * Imports "bundle_*.json" files, creating folders and actors automatically.
  */
-const content = await new Promise((resolve) => {
-  new Dialog({
-    title: "Importar do V20 Assistant",
-    content: \`<form>
-      <div class="form-group">
-        <label>Selecione o arquivo JSON (Single ou Bundle)</label>
-        <div class="form-fields">
-          <input type="file" id="import-file" accept=".json">
-        </div>
-      </div>
-    </form>\`,
-    buttons: {
-      import: {
-        icon: '<i class="fas fa-file-import"></i>',
-        label: "Importar",
-        callback: async (html) => {
-          const file = html.find("#import-file")[0].files[0];
-          if (!file) return;
-          const text = await file.text();
-          resolve(JSON.parse(text));
-        }
-      }
-    },
-    default: "import"
-  }).render(true);
-});
+(async () => {
+    const content = await new Promise((resolve) => {
+        new Dialog({
+            title: "Importar Pacote V20",
+            content: \`<p>Selecione o arquivo JSON (bundle_*.json).</p><div class="form-group"><input type="file" name="data" accept=".json"/></div>\`,
+            buttons: {
+                import: {
+                    icon: '<i class="fas fa-file-import"></i>',
+                    label: "Importar",
+                    callback: async (html) => {
+                        const file = html.find('[name="data"]')[0].files[0];
+                        if (!file) return resolve(null);
+                        const text = await file.text();
+                        resolve(JSON.parse(text));
+                    }
+                }
+            },
+            default: "import"
+        }).render(true);
+    });
 
-if (content) {
-  const actorsToCreate = content.actors ? content.actors : [content];
-  let createdCount = 0;
-  
-  for (const actorData of actorsToCreate) {
-    // Check if exists to avoid duplication (simple name check)
-    const existing = game.actors.find(a => a.name === actorData.name);
-    if (existing) {
-        const update = await Dialog.confirm({
-            title: "Actor Existente",
-            content: \`<p>O ator <strong>\${actorData.name}</strong> já existe. Deseja atualizar/sobrescrever?</p>\`
-        });
-        if (update) {
-           await existing.delete();
-        } else {
-           continue;
+    if (!content || !content.rootName) return;
+
+    ui.notifications.info(\`Iniciando importação de \${content.rootName}...\`);
+
+    // 1. Create Root Folder
+    let rootFolder = game.folders.find(f => f.name === content.rootName && f.type === "Actor");
+    if (!rootFolder) {
+        rootFolder = await Folder.create({ name: content.rootName, type: "Actor", parent: null });
+    }
+
+    // 2. Create Main Actor
+    const mainData = content.mainActor;
+    mainData.folder = rootFolder.id;
+    
+    const existingMain = game.actors.find(a => a.name === mainData.name);
+    if(existingMain) await existingMain.delete();
+    
+    await Actor.create(mainData);
+
+    // 3. Create Minions
+    if (content.minions && content.minions.length > 0) {
+        let minionFolder = game.folders.find(f => f.name === "Lacaios" && f.folder?.id === rootFolder.id);
+        if (!minionFolder) {
+            minionFolder = await Folder.create({ name: "Lacaios", type: "Actor", parent: rootFolder.id });
+        }
+
+        for (const minion of content.minions) {
+            const mData = minion.data;
+            mData.folder = minionFolder.id;
+            
+            const existingMinion = game.actors.find(a => a.name === mData.name);
+            if(existingMinion) await existingMinion.delete();
+
+            await Actor.create(mData);
         }
     }
-    
-    await Actor.create(actorData);
-    createdCount++;
-  }
-  
-  ui.notifications.info(\`Importação concluída: \${createdCount} atores criados.\`);
-}
-`;
+
+    ui.notifications.info(\`Importação concluída com sucesso!\`);
+})();`;

@@ -28,6 +28,15 @@ export interface Rumor {
   context: string; // Explanation of why it's an exaggeration or the truth behind the lie
 }
 
+export interface V20Stats {
+  attributes: Record<string, number>;
+  abilities: Record<string, number>;
+  virtues: { conscience: number, selfcontrol: number, courage: number };
+  humanity: number;
+  willpower: number;
+  bloodpool: number;
+}
+
 export interface NpcData {
   id: string;
   name: string;
@@ -58,6 +67,9 @@ export interface NpcData {
   dislikes?: string[]; 
   rumors?: Rumor[];
   minions?: string[]; 
+  
+  // V20 Technical Sheet
+  stats?: V20Stats;
 }
 
 export interface FactionData {

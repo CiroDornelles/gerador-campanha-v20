@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { EntityType, WorldContextState, NpcData, FactionData, LocationData, GeneratedEntity } from './types';
 import { generateEntity, generateEntityImage, generateFactionMap, generateFactionMembers, generateFactionLocations, generateFactionResources, upgradeNpcData, applyWorldAdjustment, harmonizeNpcProfile, generateLocationFrequenters, generateNpcMinion, suggestFrequenters } from './services/gemini';
@@ -32,7 +31,7 @@ const Modal = ({
 }: { 
   isOpen: boolean; 
   onClose: () => void; 
-  children: React.ReactNode 
+  children?: React.ReactNode; 
 }) => {
   if (!isOpen) return null;
   return (

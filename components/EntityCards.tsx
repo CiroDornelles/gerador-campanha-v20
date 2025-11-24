@@ -1,10 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
-import { NpcData, FactionData, LocationData, EntityType, GeneratedEntity, Rumor, WorldContextState } from '../types';
+import { NpcData, FactionData, LocationData, EntityType, GeneratedEntity, Rumor, WorldContextState, V20Stats } from '../types';
 import { IconSkull, IconMap, IconUsers, IconRefresh, IconSpinner, IconNetwork, IconPlus, IconMagic, IconBriefcase, IconDownload, IconEye, IconX, IconDice } from './Icons';
 import { EditControls, InputField, TextAreaField, ArrayField } from './FormFields';
 import { RelationshipGraph } from './RelationshipGraph';
 import { exportNpcToFoundry, exportBundleToFoundry, FOUNDRY_IMPORT_MACRO } from '../utils/foundryExport';
+import { generateV20Stats } from '../utils/v20Rules';
 
 // --- Helper Components ---
 const MacroModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) => {
@@ -60,6 +61,101 @@ const EntityLink = ({ name, onOpen, worldState }: { name: string, onOpen?: (n: s
     return <>{name}</>;
 };
 
+const Dots = ({ value, max = 5, onChange }: { value: number, max?: number, onChange?: (v: number) => void }) => {
+    return (
+        <div className="flex gap-0.5">
+            {Array.from({ length: max }).map((_, i) => (
+                <div 
+                    key={i} 
+                    onClick={() => onChange && onChange(i + 1)}
+                    className={`w-3 h-3 rounded-full border border-gray-600 cursor-pointer transition-colors ${i < value ? 'bg-blood' : 'bg-gray-900 hover:bg-gray-700'}`}
+                />
+            ))}
+        </div>
+    );
+}
+
+const StatsEditor = ({ stats, onChange }: { stats: V20Stats, onChange: (s: V20Stats) => void }) => {
+    const updateAttr = (key: string, val: number) => onChange({ ...stats, attributes: { ...stats.attributes, [key]: val } });
+    const updateAbil = (key: string, val: number) => onChange({ ...stats, abilities: { ...stats.abilities, [key]: val } });
+    const updateVirtue = (key: 'conscience'|'selfcontrol'|'courage', val: number) => onChange({ ...stats, virtues: { ...stats.virtues, [key]: val } });
+
+    return (
+        <div className="space-y-6 text-xs">
+            {/* Attributes */}
+            <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2">
+                    <h5 className="font-bold text-gray-500 text-center uppercase border-b border-gray-700 pb-1">Físicos</h5>
+                    {['strength', 'dexterity', 'stamina'].map(k => (
+                        <div key={k} className="flex justify-between items-center">
+                            <span className="capitalize">{k}</span>
+                            <Dots value={stats.attributes[k] || 1} onChange={(v) => updateAttr(k, v)} />
+                        </div>
+                    ))}
+                </div>
+                <div className="space-y-2">
+                    <h5 className="font-bold text-gray-500 text-center uppercase border-b border-gray-700 pb-1">Sociais</h5>
+                    {['charisma', 'manipulation', 'appearance'].map(k => (
+                        <div key={k} className="flex justify-between items-center">
+                            <span className="capitalize">{k}</span>
+                            <Dots value={stats.attributes[k] || 1} onChange={(v) => updateAttr(k, v)} />
+                        </div>
+                    ))}
+                </div>
+                <div className="space-y-2">
+                    <h5 className="font-bold text-gray-500 text-center uppercase border-b border-gray-700 pb-1">Mentais</h5>
+                    {['perception', 'intelligence', 'wits'].map(k => (
+                        <div key={k} className="flex justify-between items-center">
+                            <span className="capitalize">{k}</span>
+                            <Dots value={stats.attributes[k] || 1} onChange={(v) => updateAttr(k, v)} />
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            {/* Abilities (Selected common ones for space) */}
+            <div>
+                <h5 className="font-bold text-gray-500 text-center uppercase border-b border-gray-700 pb-1 mb-2">Habilidades (Principais)</h5>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-1">
+                    {Object.keys(stats.abilities).filter(k => stats.abilities[k] > 0).map(k => (
+                        <div key={k} className="flex justify-between items-center">
+                            <span className="capitalize truncate w-24" title={k}>{k}</span>
+                            <Dots value={stats.abilities[k]} onChange={(v) => updateAbil(k, v)} />
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            {/* Virtues */}
+            <div className="grid grid-cols-3 gap-4">
+                 <div className="flex flex-col items-center">
+                    <span>Consciência</span>
+                    <Dots value={stats.virtues.conscience} onChange={(v) => updateVirtue('conscience', v)} />
+                 </div>
+                 <div className="flex flex-col items-center">
+                    <span>Autocontrole</span>
+                    <Dots value={stats.virtues.selfcontrol} onChange={(v) => updateVirtue('selfcontrol', v)} />
+                 </div>
+                 <div className="flex flex-col items-center">
+                    <span>Coragem</span>
+                    <Dots value={stats.virtues.courage} onChange={(v) => updateVirtue('courage', v)} />
+                 </div>
+            </div>
+            
+            <div className="flex justify-center gap-8 text-center">
+                <div>
+                    <span className="block font-bold text-gray-500">Humanidade</span>
+                    <span className="text-xl font-serif">{stats.humanity}</span>
+                </div>
+                <div>
+                    <span className="block font-bold text-gray-500">Força de Vontade</span>
+                    <span className="text-xl font-serif">{stats.willpower}</span>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 const ImageContainer = ({ imageUrl, alt, onRegenerate, isLoading }: { imageUrl?: string, alt: string, onRegenerate: () => void, isLoading: boolean }) => {
   const [showLightbox, setShowLightbox] = useState(false);
 
@@ -84,69 +180,22 @@ const ImageContainer = ({ imageUrl, alt, onRegenerate, isLoading }: { imageUrl?:
           alt={alt} 
           className="w-full h-full object-cover opacity-80 group-hover:opacity-40 transition-all duration-700 group-hover:scale-105 filter group-hover:blur-sm" 
         />
-        
-        {/* Overlay Controls */}
         <div className="absolute inset-0 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 gap-4">
-           
            <div className="flex gap-4">
-              <button 
-                onClick={() => setShowLightbox(true)} 
-                className="bg-gray-900/80 hover:bg-blood text-white p-3 rounded-full border border-gray-600 hover:border-white transition-all transform hover:scale-110 shadow-lg" 
-                title="Expandir"
-              >
-                <IconEye />
-              </button>
-              
-              <button 
-                onClick={handleDownload} 
-                className="bg-gray-900/80 hover:bg-blood text-white p-3 rounded-full border border-gray-600 hover:border-white transition-all transform hover:scale-110 shadow-lg" 
-                title="Baixar Imagem"
-              >
-                <IconDownload />
-              </button>
+              <button onClick={() => setShowLightbox(true)} className="bg-gray-900/80 hover:bg-blood text-white p-3 rounded-full border border-gray-600 hover:border-white transition-all transform hover:scale-110 shadow-lg"><IconEye /></button>
+              <button onClick={handleDownload} className="bg-gray-900/80 hover:bg-blood text-white p-3 rounded-full border border-gray-600 hover:border-white transition-all transform hover:scale-110 shadow-lg"><IconDownload /></button>
            </div>
-
-           <button 
-              onClick={onRegenerate} 
-              disabled={isLoading} 
-              className="absolute top-2 right-2 bg-black/60 hover:bg-blood text-white p-2 rounded backdrop-blur border border-white/20 btn-press" 
-              title="Regenerar Imagem"
-           >
-             {isLoading ? <IconSpinner /> : <IconRefresh />}
-           </button>
+           <button onClick={onRegenerate} disabled={isLoading} className="absolute top-2 right-2 bg-black/60 hover:bg-blood text-white p-2 rounded backdrop-blur border border-white/20 btn-press"><IconRefresh /></button>
         </div>
       </div>
-
-      {/* Lightbox Modal */}
       {showLightbox && (
         <div className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in-up" onClick={() => setShowLightbox(false)}>
-           <button 
-             onClick={() => setShowLightbox(false)} 
-             className="absolute top-4 right-4 text-gray-400 hover:text-white bg-gray-800/50 p-2 rounded-full transition-colors z-[101]"
-           >
-             <IconX />
-           </button>
-
+           <button onClick={() => setShowLightbox(false)} className="absolute top-4 right-4 text-gray-400 hover:text-white bg-gray-800/50 p-2 rounded-full transition-colors z-[101]"><IconX /></button>
            <div className="relative max-w-7xl max-h-screen flex flex-col items-center" onClick={e => e.stopPropagation()}>
-              <img 
-                src={imageUrl} 
-                alt={alt} 
-                className="max-h-[85vh] max-w-full object-contain rounded shadow-[0_0_50px_rgba(138,3,3,0.3)] border border-gray-800" 
-              />
+              <img src={imageUrl} alt={alt} className="max-h-[85vh] max-w-full object-contain rounded shadow-[0_0_50px_rgba(138,3,3,0.3)] border border-gray-800" />
               <div className="mt-4 flex gap-4">
-                 <button 
-                    onClick={handleDownload} 
-                    className="flex items-center gap-2 bg-blood hover:bg-red-900 text-white px-6 py-2 rounded uppercase tracking-widest text-sm font-bold shadow-lg transition-transform hover:scale-105"
-                 >
-                    <IconDownload /> Baixar Original
-                 </button>
-                 <button 
-                    onClick={onRegenerate} 
-                    disabled={isLoading} 
-                    className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white px-6 py-2 rounded uppercase tracking-widest text-sm font-bold border border-gray-700 transition-colors"
-                 >
-                    {isLoading ? <IconSpinner /> : <IconRefresh />} Regenerar
-                 </button>
+                 <button onClick={handleDownload} className="flex items-center gap-2 bg-blood hover:bg-red-900 text-white px-6 py-2 rounded uppercase tracking-widest text-sm font-bold shadow-lg transition-transform hover:scale-105"><IconDownload /> Baixar Original</button>
+                 <button onClick={onRegenerate} disabled={isLoading} className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white px-6 py-2 rounded uppercase tracking-widest text-sm font-bold border border-gray-700 transition-colors"><IconRefresh /> Regenerar</button>
               </div>
            </div>
         </div>
@@ -184,6 +233,7 @@ export const NpcCard = ({
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState(data);
   const [showMacroModal, setShowMacroModal] = useState(false);
+  const [activeTab, setActiveTab] = useState<'LORE' | 'STATS'>('LORE');
 
   useEffect(() => { setFormData(data); }, [data]);
 
@@ -200,8 +250,15 @@ export const NpcCard = ({
       }
   }
 
+  const handleGenerateStats = () => {
+      const stats = generateV20Stats(formData);
+      const updated = { ...formData, stats };
+      setFormData(updated);
+      onUpdate(updated); // Auto-save stats
+  }
+
   const hasMinions = data.minions && data.minions.length > 0;
-  const isV2 = !!data.rumors; // Check if it's the new model
+  const isV2 = !!data.rumors;
 
   return (
     <div className="bg-paper text-gray-900 rounded shadow-lg overflow-hidden border-t-4 border-blood flex flex-col md:flex-row relative transition-all duration-500 hover:shadow-2xl">
@@ -223,7 +280,16 @@ export const NpcCard = ({
       )}
 
       <div className="flex-1 p-8 relative">
+        {/* Tab Navigation for Stats */}
+        {!isEditing && (
+            <div className="flex gap-4 mb-6 border-b border-gray-400 pb-1">
+                <button onClick={() => setActiveTab('LORE')} className={`text-sm uppercase tracking-widest font-bold pb-1 ${activeTab === 'LORE' ? 'text-blood border-b-2 border-blood' : 'text-gray-500 hover:text-gray-800'}`}>Narrativa</button>
+                <button onClick={() => setActiveTab('STATS')} className={`text-sm uppercase tracking-widest font-bold pb-1 ${activeTab === 'STATS' ? 'text-blood border-b-2 border-blood' : 'text-gray-500 hover:text-gray-800'}`}>Ficha Técnica</button>
+            </div>
+        )}
+
         {!isEditing ? (
+          activeTab === 'LORE' ? (
           <div className="animate-fade-in-up">
             <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none transform rotate-12"><IconSkull /></div>
             <div className="flex justify-between items-baseline border-b-2 border-gray-400 pb-2 mb-4 pr-12 flex-wrap gap-2">
@@ -345,6 +411,24 @@ export const NpcCard = ({
               </div>
             )}
           </div>
+          ) : (
+              <div className="animate-fade-in-up">
+                  <div className="flex justify-between items-center mb-4">
+                      <h2 className="text-xl font-serif text-gray-800">Ficha Técnica (V20)</h2>
+                      <button onClick={handleGenerateStats} className="bg-blood text-white px-3 py-1 rounded uppercase text-xs font-bold shadow hover:bg-red-900 flex items-center gap-2 btn-press">
+                          <IconDice /> Calcular (Regras)
+                      </button>
+                  </div>
+                  {data.stats ? (
+                      <StatsEditor stats={data.stats} onChange={(s) => { onUpdate({...data, stats: s}); }} />
+                  ) : (
+                      <div className="text-center py-12 bg-black/5 rounded border border-dashed border-gray-400">
+                          <p className="text-gray-500 mb-4">Nenhuma ficha técnica gerada ainda.</p>
+                          <button onClick={handleGenerateStats} className="bg-gray-800 text-white px-4 py-2 rounded uppercase text-sm font-bold hover:bg-gray-700">Gerar Agora</button>
+                      </div>
+                  )}
+              </div>
+          )
         ) : (
           <div className="space-y-4 pr-8 animate-fade-in-up">
              {onHarmonize && (

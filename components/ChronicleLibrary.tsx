@@ -1,7 +1,44 @@
-
 import React, { useState } from 'react';
 import { EntityType, WorldContextState, GeneratedEntity, NpcData, FactionData, LocationData } from '../types';
 import { IconEye, IconUsers } from './Icons';
+
+// Helper Components - Defined before usage to ensure proper TS inference
+const EmptyState = () => (
+    <div className="col-span-full text-center py-12 bg-gray-900/50 rounded border border-gray-800 border-dashed animate-pulse">
+        <p className="text-gray-600">Nada registrado no sangue ainda.</p>
+    </div>
+);
+
+const LibraryCard = ({ item, type, onSelect, index }: { item: any, type: EntityType, onSelect: (e: GeneratedEntity) => void, index: number }) => (
+    <div 
+      onClick={() => onSelect({ type, data: item })}
+      className="card-hover group bg-panel border border-gray-800 hover:border-blood transition-all p-4 rounded cursor-pointer flex gap-4 items-start animate-fade-in-up"
+      style={{ animationDelay: `${index * 50}ms` }}
+    >
+      <div className="w-16 h-16 bg-black flex-shrink-0 overflow-hidden rounded border border-gray-700 transition-colors group-hover:border-blood">
+        {item.imageUrl ? (
+          <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-gray-700 group-hover:text-blood transition-colors">
+            <IconEye />
+          </div>
+        )}
+      </div>
+      <div className="overflow-hidden">
+        <h4 className="font-serif font-bold text-gray-200 truncate group-hover:text-blood transition-colors">{item.name}</h4>
+        <p className="text-xs text-gray-500 uppercase tracking-wide mt-1">
+           {type === EntityType.NPC ? (item as NpcData).clan : 
+            type === EntityType.FACTION ? (item as FactionData).type : 
+            (item as LocationData).type}
+        </p>
+        <p className="text-xs text-gray-600 truncate mt-1">
+           {type === EntityType.NPC ? (item as NpcData).generation : 
+            type === EntityType.FACTION ? (item as FactionData).leader : 
+            (item as LocationData).controlledBy}
+        </p>
+      </div>
+    </div>
+);
 
 export const ChronicleLibrary = ({ 
     worldState, 
@@ -117,40 +154,3 @@ export const ChronicleLibrary = ({
       </div>
     );
 };
-
-const EmptyState = () => (
-    <div className="col-span-full text-center py-12 bg-gray-900/50 rounded border border-gray-800 border-dashed animate-pulse">
-        <p className="text-gray-600">Nada registrado no sangue ainda.</p>
-    </div>
-);
-
-const LibraryCard = ({ item, type, onSelect, index }: { item: any, type: EntityType, onSelect: (e: GeneratedEntity) => void, index: number }) => (
-    <div 
-      onClick={() => onSelect({ type, data: item })}
-      className="card-hover group bg-panel border border-gray-800 hover:border-blood transition-all p-4 rounded cursor-pointer flex gap-4 items-start animate-fade-in-up"
-      style={{ animationDelay: `${index * 50}ms` }}
-    >
-      <div className="w-16 h-16 bg-black flex-shrink-0 overflow-hidden rounded border border-gray-700 transition-colors group-hover:border-blood">
-        {item.imageUrl ? (
-          <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-gray-700 group-hover:text-blood transition-colors">
-            <IconEye />
-          </div>
-        )}
-      </div>
-      <div className="overflow-hidden">
-        <h4 className="font-serif font-bold text-gray-200 truncate group-hover:text-blood transition-colors">{item.name}</h4>
-        <p className="text-xs text-gray-500 uppercase tracking-wide mt-1">
-           {type === EntityType.NPC ? (item as NpcData).clan : 
-            type === EntityType.FACTION ? (item as FactionData).type : 
-            (item as LocationData).type}
-        </p>
-        <p className="text-xs text-gray-600 truncate mt-1">
-           {type === EntityType.NPC ? (item as NpcData).generation : 
-            type === EntityType.FACTION ? (item as FactionData).leader : 
-            (item as LocationData).controlledBy}
-        </p>
-      </div>
-    </div>
-);
