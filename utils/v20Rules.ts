@@ -73,13 +73,13 @@ class CharacterSheet {
 
 const getAbilityPriorities = (concept: string): string[] => {
     const c = concept.toLowerCase();
-    if (c.includes('soldado') || c.includes('guarda') || c.includes('capanga') || c.includes('assassino') || c.includes('atleta') || c.includes('valentão')) {
+    if (c.includes('soldado') || c.includes('guarda') || c.includes('capanga') || c.includes('assassino') || c.includes('atleta') || c.includes('valentão') || c.includes('batedor')) {
         return ['skills', 'talents', 'knowledges'];
     }
-    if (c.includes('intelectual') || c.includes('hacker') || c.includes('medico') || c.includes('investigador') || c.includes('professor') || c.includes('filosofo')) {
+    if (c.includes('intelectual') || c.includes('hacker') || c.includes('medico') || c.includes('investigador') || c.includes('professor') || c.includes('filosofo') || c.includes('cientista')) {
         return ['knowledges', 'skills', 'talents'];
     }
-    if (c.includes('politico') || c.includes('socialite') || c.includes('lider') || c.includes('artista') || c.includes('galante')) {
+    if (c.includes('politico') || c.includes('socialite') || c.includes('lider') || c.includes('artista') || c.includes('galante') || c.includes('nobre')) {
         return ['talents', 'knowledges', 'skills'];
     }
     return ['talents', 'skills', 'knowledges']; 
@@ -91,11 +91,11 @@ const applyBonusPoints = (sheet: CharacterSheet, nature: string, points: number)
 
     const strategy: Array<'ATTR_PHYS'|'ATTR_SOC'|'ATTR_MEN'|'ABIL'|'WP'|'BG'> = [];
 
-    if (n.includes('valentão') || n.includes('fera') || n.includes('sobrevivente') || n.includes('monstro')) {
+    if (n.includes('valentão') || n.includes('fera') || n.includes('sobrevivente') || n.includes('monstro') || n.includes('caçador')) {
         strategy.push('ATTR_PHYS', 'WP', 'ABIL');
-    } else if (n.includes('autocrata') || n.includes('tirano') || n.includes('galante') || n.includes('lider')) {
+    } else if (n.includes('autocrata') || n.includes('tirano') || n.includes('galante') || n.includes('lider') || n.includes('bon viv')) {
         strategy.push('ATTR_SOC', 'BG', 'WP');
-    } else if (n.includes('arquiteto') || n.includes('visionario') || n.includes('filosofo') || n.includes('enigma')) {
+    } else if (n.includes('arquiteto') || n.includes('visionario') || n.includes('filosofo') || n.includes('enigma') || n.includes('pedagogo')) {
         strategy.push('ATTR_MEN', 'ABIL', 'WP');
     } else {
         strategy.push('WP', 'ATTR_SOC', 'ABIL');
@@ -120,15 +120,22 @@ const applyBonusPoints = (sheet: CharacterSheet, nature: string, points: number)
         }
         
         if (target === 'BG' && remaining >= COSTS.BACKGROUND) {
-            // Generic BG for logic simplicity, real items managed elsewhere
+            // Generic BG for logic simplicity
             sheet.addBackground("Recursos", 1); 
             remaining -= COSTS.BACKGROUND; continue;
         }
         
         if (target === 'ABIL' && remaining >= COSTS.ABILITY) {
              const allAbils = [...ABILITIES_LIST.talents, ...ABILITIES_LIST.skills, ...ABILITIES_LIST.knowledges];
-             const k = allAbils[Math.floor(Math.random() * allAbils.length)];
-             if(sheet.abilities[k] < 5) { sheet.abilities[k]++; remaining -= COSTS.ABILITY; continue; }
+             // Try to boost existing abilities first
+             const existing = allAbils.filter(k => sheet.abilities[k] > 0 && sheet.abilities[k] < 5);
+             if (existing.length > 0) {
+                 const k = existing[Math.floor(Math.random() * existing.length)];
+                 sheet.abilities[k]++; remaining -= COSTS.ABILITY; continue;
+             } else {
+                 const k = allAbils[Math.floor(Math.random() * allAbils.length)];
+                 if(sheet.abilities[k] < 5) { sheet.abilities[k]++; remaining -= COSTS.ABILITY; continue; }
+             }
         }
         
         // Dump remaining if cheap

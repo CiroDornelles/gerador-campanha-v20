@@ -484,8 +484,6 @@ export const NpcCard = ({
   );
 };
 
-// ... (Rest of the file: FactionCard, LocationCard, DisplayCard - unchanged)
-
 // --- Faction Card ---
 export const FactionCard = ({ 
   data, 
