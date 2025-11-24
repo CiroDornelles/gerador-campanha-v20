@@ -35,13 +35,14 @@ const npcSchema: Schema = {
     relationships: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Conexões com facções ou NPCs existentes." },
     quote: { type: Type.STRING },
     // V2 Fields
-    birthDate: { type: Type.STRING, description: "Ano ou data de nascimento mortal" },
-    embraceDate: { type: Type.STRING, description: "Ano ou data do abraço" },
+    birthDate: { type: Type.STRING, description: "Data Completa de Nascimento (Dia, Mês, Ano, Hora se relevante). Ex: '12 de Outubro de 1985, às 03:00'" },
+    embraceDate: { type: Type.STRING, description: "Data Completa do Abraço (Dia, Mês, Ano). Ex: '04 de Fevereiro de 2010'" },
+    parents: { type: Type.STRING, description: "Nomes dos pais biológicos mortais. Ex: 'João e Maria Silva'" },
     likes: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Exatamente 5 coisas que o NPC gosta (hobbies, manias, prazeres)" },
     dislikes: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Exatamente 5 coisas que o NPC odeia" },
     rumors: { type: Type.ARRAY, items: rumorSchema, description: "Lista de rumores sobre o NPC (Verdadeiros, Falsos, Exageros)" }
   },
-  required: ["id", "name", "clan", "history", "influence", "birthDate", "embraceDate", "likes", "dislikes", "rumors"],
+  required: ["id", "name", "clan", "history", "influence", "birthDate", "embraceDate", "parents", "likes", "dislikes", "rumors"],
 };
 
 const factionSchema: Schema = {
@@ -108,13 +109,14 @@ const upgradeNpcSchema: Schema = {
   type: Type.OBJECT,
   properties: {
     history: { type: Type.STRING, description: "História expandida e reestruturada em 5 parágrafos se a original for curta." },
-    birthDate: { type: Type.STRING },
-    embraceDate: { type: Type.STRING },
+    birthDate: { type: Type.STRING, description: "DD/MM/AAAA HH:MM" },
+    embraceDate: { type: Type.STRING, description: "DD/MM/AAAA" },
+    parents: { type: Type.STRING },
     likes: { type: Type.ARRAY, items: { type: Type.STRING }, description: "5 itens" },
     dislikes: { type: Type.ARRAY, items: { type: Type.STRING }, description: "5 itens" },
     rumors: { type: Type.ARRAY, items: rumorSchema }
   },
-  required: ["birthDate", "embraceDate", "likes", "dislikes", "rumors"]
+  required: ["birthDate", "embraceDate", "parents", "likes", "dislikes", "rumors"]
 };
 
 const multiNpcSchema: Schema = {
@@ -125,6 +127,11 @@ const multiNpcSchema: Schema = {
 const multiLocationSchema: Schema = {
   type: Type.ARRAY,
   items: locationSchema
+};
+
+const resourcesSchema: Schema = {
+  type: Type.ARRAY,
+  items: { type: Type.STRING }
 };
 
 const adjustmentSchema: Schema = {
@@ -196,7 +203,9 @@ export const generateEntity = async (
       5. Ambição Atual e o Futuro (A Trama): O que ele quer AGORA? Que planos secretos ele move?
 
       DADOS EXTRAS:
-      - Inclua Data de Nascimento e Data do Abraço.
+      - Data de Nascimento (Dia, Mês, Ano, Hora).
+      - Data do Abraço (Dia, Mês, Ano).
+      - Nomes dos Pais Mortais.
       - Liste 5 Gostos e 5 Desgostos.
       - Crie rumores detalhados.`;
       break;
@@ -249,11 +258,12 @@ export const upgradeNpcData = async (npc: NpcData, apiKey: string): Promise<Part
 
     Tarefa: Gere os novos campos obrigatórios e REESCREVA a história se ela for curta:
     
-    1. História (Opcional, se a atual for fraca): Reescreva em 5 parágrafos (Vida Mortal, Abraço, Adaptação, Virada, Ambição). Se a original já for boa, mantenha.
-    2. Data de Nascimento e Data do Abraço.
-    3. 5 Gostos.
-    4. 5 Desgostos.
-    5. Rumores (Verdadeiros, Exageros, Falsos).`;
+    1. História (Opcional, se a atual for fraca): Reescreva em 5 parágrafos.
+    2. Data de Nascimento (Dia, Mês, Ano, Hora).
+    3. Data do Abraço (Dia, Mês, Ano).
+    4. Nomes dos Pais.
+    5. 5 Gostos e 5 Desgostos.
+    6. Rumores (Verdadeiros, Exageros, Falsos).`;
 
     try {
         const response = await ai.models.generateContent({
@@ -273,6 +283,54 @@ export const upgradeNpcData = async (npc: NpcData, apiKey: string): Promise<Part
 
     } catch (e) {
         console.error("Upgrade NPC Error", e);
+        throw e;
+    }
+}
+
+export const harmonizeNpcProfile = async (npc: NpcData, apiKey: string): Promise<NpcData> => {
+    const ai = getClient(apiKey);
+    
+    const systemInstruction = `Você é um Narrador de V20.
+    O usuário alterou manualmente partes da ficha deste NPC (provavelmente a História).
+    Sua tarefa é REESCREVER os campos derivados (Natureza, Comportamento, Aparencia, Rumores, Gostos, Desgostos) para que eles façam sentido com a NOVA História/Dados fornecidos.
+    
+    Mantenha o Nome, Clã, Geração e Senhor, a menos que a história contradiga isso explicitamente.
+    Garanta que a Data de Nascimento e Abraço façam sentido cronológico com a história.
+    Use Português do Brasil.`;
+
+    const prompt = `
+    FICHA DO NPC (Com edições manuais do usuário):
+    Nome: ${npc.name}
+    Clã: ${npc.clan}
+    História Atual (FONTE DA VERDADE): ${npc.history}
+    
+    Outros dados atuais (podem estar desatualizados em relação à história):
+    Natureza: ${npc.nature}
+    Aparência: ${npc.appearance}
+    Rumores: ${JSON.stringify(npc.rumors)}
+    
+    TAREFA:
+    Reescreva a ficha completa (todos os campos do schema) para harmonizar com a nova História.
+    Se a história diz que ele é um nobre, mas a aparência diz que é um mendigo, mude a aparência para nobre.
+    Gere datas completas (Dia/Mês/Ano/Hora) e nomes dos pais se faltarem.`;
+
+    try {
+        const response = await ai.models.generateContent({
+            model: MODEL_NAME,
+            contents: prompt,
+            config: {
+                systemInstruction: systemInstruction,
+                responseMimeType: "application/json",
+                responseSchema: npcSchema, // Return full valid NPC object
+                temperature: 0.85,
+            }
+        });
+
+        const text = response.text;
+        if (!text) throw new Error("Sem resposta da IA");
+        return JSON.parse(text) as NpcData;
+    } catch(e) {
+        console.error("Harmonize NPC Error", e);
         throw e;
     }
 }
@@ -297,7 +355,7 @@ export const generateFactionMembers = async (
   2. HIERARQUIA: Crie papéis claros (Líder, Executor, Espião, Conselheiro, etc) baseados na solicitação.
   3. CONFLITO: Crie rivalidades internas ou segredos entre eles.
   4. Use Português do Brasil.
-  5. GERE FICHAS COMPLETAS COM A ESTRUTURA DE HISTÓRIA DE 5 PARÁGRAFOS (Mortal, Abraço, Primeiras Noites, Virada, Ambição).
+  5. GERE FICHAS COMPLETAS COM A ESTRUTURA DE HISTÓRIA DE 5 PARÁGRAFOS.
   
   ESTADO DO MUNDO (JSON):
   ${worldContext}`;
@@ -308,14 +366,10 @@ export const generateFactionMembers = async (
      prompt = `Gere ${count} NPCs membros da facção "${faction.name}".
      Tipo da Facção: ${faction.type}.
      Objetivos: ${faction.goals}.
-     Crie uma hierarquia funcional com ${count} membros.
-     Inclua para CADA UM: História em 5 parágrafos, Datas, Gostos, Desgostos, Rumores.`;
+     Inclua para CADA UM: História Completa, Datas (Dia/Mês/Ano), Pais, Gostos, Desgostos, Rumores.`;
   } else {
-     prompt = `Gere NPCs membros da facção "${faction.name}" preenchendo as seguintes funções ou descrições solicitadas: "${userInput}".
-     Tipo da Facção: ${faction.type}.
-     Objetivos: ${faction.goals}.
-     Certifique-se de criar um NPC para cada papel ou descrição solicitada.
-     Inclua para CADA UM: História em 5 parágrafos, Datas, Gostos, Desgostos, Rumores.`;
+     prompt = `Gere NPCs membros da facção "${faction.name}" preenchendo as seguintes funções: "${userInput}".
+     Inclua para CADA UM: História Completa, Datas (Dia/Mês/Ano), Pais, Gostos, Desgostos, Rumores.`;
   }
 
   try {
@@ -383,6 +437,52 @@ export const generateFactionLocations = async (
     throw error;
   }
 };
+
+export const generateFactionResources = async (
+  faction: FactionData,
+  userInput: string,
+  worldState: WorldContextState,
+  apiKey: string
+): Promise<string[]> => {
+  const ai = getClient(apiKey);
+  const worldContext = serializeWorldState(worldState);
+
+  const systemInstruction = `Você é um Narrador de V20.
+  Sua tarefa é gerar novos recursos (assets), contatos, relíquias ou fontes de renda para uma facção existente.
+  Use Português do Brasil.
+  
+  ESTADO DO MUNDO (JSON):
+  ${worldContext}`;
+
+  const prompt = `Gere novos recursos para a facção: "${faction.name}" (${faction.type}).
+  Objetivos: "${faction.goals}".
+  Recursos Atuais: ${faction.resources.join(", ")}.
+  
+  Diretriz do usuário: "${userInput || "Gere recursos úteis para expandir a influência deles."}".
+  
+  Retorne uma lista de strings curtas e descritivas (ex: "Contatos na Polícia Federal", "Um refúgio de emergência no Porto").`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: MODEL_NAME,
+      contents: prompt,
+      config: {
+        systemInstruction: systemInstruction,
+        responseMimeType: "application/json",
+        responseSchema: resourcesSchema,
+        temperature: 0.85,
+      },
+    });
+
+    const text = response.text;
+    if (!text) throw new Error("Sem resposta da IA");
+
+    return JSON.parse(text) as string[];
+  } catch (error) {
+    console.error("Resource Generation Error", error);
+    throw error;
+  }
+}
 
 export const applyWorldAdjustment = async (
   instruction: string,

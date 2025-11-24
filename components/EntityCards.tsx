@@ -1,22 +1,102 @@
 import React, { useState, useEffect } from 'react';
 import { NpcData, FactionData, LocationData, EntityType, GeneratedEntity, Rumor } from '../types';
-import { IconSkull, IconMap, IconUsers, IconRefresh, IconSpinner, IconNetwork, IconPlus, IconMagic } from './Icons';
+import { IconSkull, IconMap, IconUsers, IconRefresh, IconSpinner, IconNetwork, IconPlus, IconMagic, IconBriefcase, IconDownload, IconEye, IconX } from './Icons';
 import { EditControls, InputField, TextAreaField, ArrayField } from './FormFields';
 import { RelationshipGraph } from './RelationshipGraph';
 
 // --- Shared Image Component ---
 const ImageContainer = ({ imageUrl, alt, onRegenerate, isLoading }: { imageUrl?: string, alt: string, onRegenerate: () => void, isLoading: boolean }) => {
+  const [showLightbox, setShowLightbox] = useState(false);
+
   if (!imageUrl) return null;
+
+  const handleDownload = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!imageUrl) return;
+    const link = document.createElement('a');
+    link.href = imageUrl;
+    link.download = `v20_art_${alt.replace(/\s+/g, '_').toLowerCase()}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
-    <div className="w-full h-64 md:h-full bg-black border-b md:border-b-0 md:border-l border-gray-700 overflow-hidden relative group">
-      <img src={imageUrl} alt={alt} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-all duration-700 group-hover:scale-105" />
-      <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-80 group-hover:opacity-60 transition-opacity"></div>
-      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-         <button onClick={onRegenerate} disabled={isLoading} className="btn-press bg-black/60 hover:bg-blood text-white p-2 rounded backdrop-blur border border-white/20" title="Regenerar Imagem">
-           {isLoading ? <IconSpinner /> : <IconRefresh />}
-         </button>
+    <>
+      <div className="w-full h-64 md:h-full bg-black border-b md:border-b-0 md:border-l border-gray-700 overflow-hidden relative group">
+        <img 
+          src={imageUrl} 
+          alt={alt} 
+          className="w-full h-full object-cover opacity-80 group-hover:opacity-40 transition-all duration-700 group-hover:scale-105 filter group-hover:blur-sm" 
+        />
+        
+        {/* Overlay Controls */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 gap-4">
+           
+           <div className="flex gap-4">
+              <button 
+                onClick={() => setShowLightbox(true)} 
+                className="bg-gray-900/80 hover:bg-blood text-white p-3 rounded-full border border-gray-600 hover:border-white transition-all transform hover:scale-110 shadow-lg" 
+                title="Expandir"
+              >
+                <IconEye />
+              </button>
+              
+              <button 
+                onClick={handleDownload} 
+                className="bg-gray-900/80 hover:bg-blood text-white p-3 rounded-full border border-gray-600 hover:border-white transition-all transform hover:scale-110 shadow-lg" 
+                title="Baixar Imagem"
+              >
+                <IconDownload />
+              </button>
+           </div>
+
+           <button 
+              onClick={onRegenerate} 
+              disabled={isLoading} 
+              className="absolute top-2 right-2 bg-black/60 hover:bg-blood text-white p-2 rounded backdrop-blur border border-white/20 btn-press" 
+              title="Regenerar Imagem"
+           >
+             {isLoading ? <IconSpinner /> : <IconRefresh />}
+           </button>
+        </div>
       </div>
-    </div>
+
+      {/* Lightbox Modal */}
+      {showLightbox && (
+        <div className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in-up" onClick={() => setShowLightbox(false)}>
+           <button 
+             onClick={() => setShowLightbox(false)} 
+             className="absolute top-4 right-4 text-gray-400 hover:text-white bg-gray-800/50 p-2 rounded-full transition-colors z-[101]"
+           >
+             <IconX />
+           </button>
+
+           <div className="relative max-w-7xl max-h-screen flex flex-col items-center" onClick={e => e.stopPropagation()}>
+              <img 
+                src={imageUrl} 
+                alt={alt} 
+                className="max-h-[85vh] max-w-full object-contain rounded shadow-[0_0_50px_rgba(138,3,3,0.3)] border border-gray-800" 
+              />
+              <div className="mt-4 flex gap-4">
+                 <button 
+                    onClick={handleDownload} 
+                    className="flex items-center gap-2 bg-blood hover:bg-red-900 text-white px-6 py-2 rounded uppercase tracking-widest text-sm font-bold shadow-lg transition-transform hover:scale-105"
+                 >
+                    <IconDownload /> Baixar Original
+                 </button>
+                 <button 
+                    onClick={onRegenerate} 
+                    disabled={isLoading} 
+                    className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white px-6 py-2 rounded uppercase tracking-widest text-sm font-bold border border-gray-700 transition-colors"
+                 >
+                    {isLoading ? <IconSpinner /> : <IconRefresh />} Regenerar
+                 </button>
+              </div>
+           </div>
+        </div>
+      )}
+    </>
   );
 };
 
@@ -26,6 +106,7 @@ export const NpcCard = ({
   onUpdate, 
   onRegenerateImage, 
   onUpgradeProfile,
+  onHarmonize,
   isImageLoading,
   isLoading,
   apiKey
@@ -34,6 +115,7 @@ export const NpcCard = ({
   onUpdate: (d: NpcData) => void, 
   onRegenerateImage: () => void, 
   onUpgradeProfile: (n: NpcData) => void,
+  onHarmonize?: (n: NpcData) => Promise<NpcData | null>,
   isImageLoading: boolean,
   isLoading: boolean,
   apiKey: string
@@ -47,6 +129,14 @@ export const NpcCard = ({
     onUpdate(formData);
     setIsEditing(false);
   };
+
+  const handleHarmonizeClick = async () => {
+      if (!onHarmonize) return;
+      const harmonizedData = await onHarmonize(formData);
+      if (harmonizedData) {
+          setFormData(harmonizedData);
+      }
+  }
 
   const isV2 = !!data.rumors; // Check if it's the new model
 
@@ -69,6 +159,7 @@ export const NpcCard = ({
                 <p><strong>Senhor:</strong> {data.sire}</p>
                 <p><strong>Natureza:</strong> {data.nature}</p>
                 <p><strong>Comportamento:</strong> {data.demeanor}</p>
+                {data.parents && <p className="text-sm text-gray-700"><strong>Pais Mortais:</strong> {data.parents}</p>}
                 {data.birthDate && <p className="mt-2 text-sm text-gray-700"><strong>Nascimento:</strong> {data.birthDate}</p>}
                 {data.embraceDate && <p className="text-sm text-gray-700"><strong>Abraço:</strong> {data.embraceDate}</p>}
               </div>
@@ -143,6 +234,16 @@ export const NpcCard = ({
           </div>
         ) : (
           <div className="space-y-4 pr-8 animate-fade-in-up">
+             {onHarmonize && (
+                <button 
+                    onClick={handleHarmonizeClick} 
+                    disabled={isLoading}
+                    className="w-full py-2 bg-purple-900/80 border border-purple-500 text-white rounded shadow hover:bg-purple-800 transition-colors uppercase text-xs tracking-widest font-bold flex justify-center items-center gap-2 mb-4"
+                >
+                    {isLoading ? <IconSpinner /> : <IconMagic />} Harmonizar Ficha (Baseado na História)
+                </button>
+             )}
+
             <div className="grid grid-cols-2 gap-4">
                <InputField label="Nome" value={formData.name} onChange={v => setFormData({...formData, name: v})} />
                <InputField label="Clã" value={formData.clan} onChange={v => setFormData({...formData, clan: v})} />
@@ -156,9 +257,11 @@ export const NpcCard = ({
                <InputField label="Comportamento" value={formData.demeanor} onChange={v => setFormData({...formData, demeanor: v})} />
             </div>
             
+            <InputField label="Pais Mortais" value={formData.parents || ''} onChange={v => setFormData({...formData, parents: v})} />
+
             <div className="grid grid-cols-2 gap-4">
-               <InputField label="Nascimento" value={formData.birthDate || ''} onChange={v => setFormData({...formData, birthDate: v})} />
-               <InputField label="Abraço" value={formData.embraceDate || ''} onChange={v => setFormData({...formData, embraceDate: v})} />
+               <InputField label="Nascimento (DD/MM/AAAA HH:MM)" value={formData.birthDate || ''} onChange={v => setFormData({...formData, birthDate: v})} />
+               <InputField label="Abraço (DD/MM/AAAA)" value={formData.embraceDate || ''} onChange={v => setFormData({...formData, embraceDate: v})} />
             </div>
 
             <InputField label="Citação" value={formData.quote} onChange={v => setFormData({...formData, quote: v})} />
@@ -188,6 +291,7 @@ export const FactionCard = ({
   onGenerateMap, 
   onGenerateMembers,
   onGenerateLocations,
+  onGenerateResources,
   onApplyAdjustment,
   isLoading,
   onRegenerateImage, 
@@ -199,6 +303,7 @@ export const FactionCard = ({
   onGenerateMap: (f: FactionData) => void, 
   onGenerateMembers: (f: FactionData, input: string) => void,
   onGenerateLocations: (f: FactionData, input: string) => void,
+  onGenerateResources: (f: FactionData, input: string) => void,
   onApplyAdjustment: (f: FactionData, instruction: string) => void,
   isLoading: boolean,
   onRegenerateImage: () => void,
@@ -207,6 +312,7 @@ export const FactionCard = ({
 }) => {
   const [memberInput, setMemberInput] = useState("3");
   const [locationInput, setLocationInput] = useState("");
+  const [resourceInput, setResourceInput] = useState("");
   const [adjustmentInput, setAdjustmentInput] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState(data);
@@ -298,6 +404,18 @@ export const FactionCard = ({
                       </div>
                     </div>
                  </div>
+                 
+                 {/* Mass Resources - NEW */}
+                 <div>
+                    <h4 className="text-gray-400 text-xs uppercase tracking-widest flex items-center gap-2 mb-2"><IconBriefcase /> Adquirir Recursos</h4>
+                    <div className="bg-black/30 p-4 rounded border border-gray-800 transition-colors hover:border-gray-700">
+                      <p className="text-xs text-gray-500 mb-3">Gere novos assets, contatos ou relíquias.</p>
+                      <div className="flex gap-2 items-center">
+                        <input type="text" value={resourceInput} onChange={(e) => setResourceInput(e.target.value)} placeholder="Ex: Contatos, Armas..." className="flex-1 bg-gray-800 border border-gray-700 text-white rounded px-3 py-1 text-sm focus:border-blood focus:outline-none transition-colors" />
+                        <button onClick={() => onGenerateResources(data, resourceInput)} disabled={isLoading} className="btn-press bg-blood hover:bg-red-900 text-white text-xs px-3 py-1.5 rounded uppercase tracking-wider transition-colors disabled:opacity-50">{isLoading ? '...' : 'Criar'}</button>
+                      </div>
+                    </div>
+                 </div>
 
                  {/* Global Adjustment */}
                  <div>
@@ -357,13 +475,7 @@ export const LocationCard = ({ data, onUpdate, onRegenerateImage, isImageLoading
       
       {data.imageUrl && (
         <div className="w-full h-48 md:h-64 relative group overflow-hidden">
-           <img src={data.imageUrl} alt={data.name} className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" />
-           <div className="absolute inset-0 bg-gradient-to-t from-black to-transparent opacity-90 transition-opacity group-hover:opacity-70"></div>
-           <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-              <button onClick={onRegenerateImage} disabled={isImageLoading} className="btn-press bg-black/60 hover:bg-blood text-white p-2 rounded backdrop-blur border border-white/20" title="Regenerar Imagem">
-                {isImageLoading ? <IconSpinner /> : <IconRefresh />}
-              </button>
-           </div>
+           <ImageContainer imageUrl={data.imageUrl} alt={data.name} onRegenerate={onRegenerateImage} isLoading={isImageLoading} />
         </div>
       )}
       <div className="flex flex-col md:flex-row">
@@ -420,9 +532,11 @@ export const DisplayCard = ({
   onGenerateMap, 
   onGenerateMembers,
   onGenerateLocations,
+  onGenerateResources,
   onApplyAdjustment,
   onGenerateImage,
   onUpgradeProfile,
+  onHarmonizeNpc,
   isLoading,
   isImageLoading,
   apiKey
@@ -432,18 +546,20 @@ export const DisplayCard = ({
   onGenerateMap: (f: FactionData) => void, 
   onGenerateMembers: (f: FactionData, input: string) => void,
   onGenerateLocations: (f: FactionData, input: string) => void,
+  onGenerateResources: (f: FactionData, input: string) => void,
   onApplyAdjustment: (f: FactionData, instruction: string) => void,
   onGenerateImage: (e: GeneratedEntity) => void,
   onUpgradeProfile: (n: NpcData) => void,
+  onHarmonizeNpc?: (n: NpcData) => Promise<NpcData | null>,
   isLoading: boolean,
   isImageLoading: boolean,
   apiKey: string
 }) => {
   switch (entity.type) {
     case EntityType.NPC:
-      return <NpcCard data={entity.data} onUpdate={(d) => onUpdate({...entity, data: d})} onRegenerateImage={() => onGenerateImage(entity)} onUpgradeProfile={onUpgradeProfile} isImageLoading={isImageLoading} isLoading={isLoading} apiKey={apiKey} />;
+      return <NpcCard data={entity.data} onUpdate={(d) => onUpdate({...entity, data: d})} onRegenerateImage={() => onGenerateImage(entity)} onUpgradeProfile={onUpgradeProfile} onHarmonize={onHarmonizeNpc} isImageLoading={isImageLoading} isLoading={isLoading} apiKey={apiKey} />;
     case EntityType.FACTION:
-      return <FactionCard data={entity.data} onUpdate={(d) => onUpdate({...entity, data: d})} onGenerateMap={onGenerateMap} onGenerateMembers={onGenerateMembers} onGenerateLocations={onGenerateLocations} onApplyAdjustment={onApplyAdjustment} isLoading={isLoading} onRegenerateImage={() => onGenerateImage(entity)} isImageLoading={isImageLoading} apiKey={apiKey} />;
+      return <FactionCard data={entity.data} onUpdate={(d) => onUpdate({...entity, data: d})} onGenerateMap={onGenerateMap} onGenerateMembers={onGenerateMembers} onGenerateLocations={onGenerateLocations} onGenerateResources={onGenerateResources} onApplyAdjustment={onApplyAdjustment} isLoading={isLoading} onRegenerateImage={() => onGenerateImage(entity)} isImageLoading={isImageLoading} apiKey={apiKey} />;
     case EntityType.LOCATION:
       return <LocationCard data={entity.data} onUpdate={(d) => onUpdate({...entity, data: d})} onRegenerateImage={() => onGenerateImage(entity)} isImageLoading={isImageLoading} apiKey={apiKey} />;
     default:

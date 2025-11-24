@@ -271,6 +271,7 @@ const renderEntityPage = (doc: any, entity: GeneratedEntity) => {
             { l: "Senhor", v: data.sire },
             { l: "Natureza", v: data.nature },
             { l: "Comportamento", v: data.demeanor },
+            { l: "Pais", v: data.parents },
             { l: "Nascimento", v: data.birthDate },
             { l: "Abraço", v: data.embraceDate },
         ];

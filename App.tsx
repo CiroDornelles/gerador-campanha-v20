@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { EntityType, WorldContextState, NpcData, FactionData, LocationData, GeneratedEntity } from './types';
-import { generateEntity, generateEntityImage, generateFactionMap, generateFactionMembers, generateFactionLocations, upgradeNpcData, applyWorldAdjustment } from './services/gemini';
+import { generateEntity, generateEntityImage, generateFactionMap, generateFactionMembers, generateFactionLocations, generateFactionResources, upgradeNpcData, applyWorldAdjustment, harmonizeNpcProfile } from './services/gemini';
 import { exportChronicleToPDF, exportSingleEntityPDF } from './utils/pdfExport';
 
 // Imported Components
@@ -338,6 +338,24 @@ export default function App() {
     }
   };
 
+  const handleGenerateFactionResources = async (faction: FactionData, input: string) => {
+    if (!checkApiKey()) return;
+    setIsLoading(true);
+    try {
+      const newResources = await generateFactionResources(faction, input, worldState, apiKey);
+      const updatedFaction = {
+          ...faction,
+          resources: [...faction.resources, ...newResources]
+      };
+      handleUpdateEntity({ type: EntityType.FACTION, data: updatedFaction });
+    } catch(e) {
+        console.error(e);
+        alert("Erro ao gerar recursos para a facção.");
+    } finally {
+        setIsLoading(false);
+    }
+  }
+
   const handleUpgradeNpcProfile = async (npc: NpcData) => {
     if (!checkApiKey()) return;
     setIsLoading(true);
@@ -352,6 +370,22 @@ export default function App() {
         setIsLoading(false);
     }
   };
+
+  const handleHarmonizeNpc = async (npcData: NpcData): Promise<NpcData | null> => {
+      if (!checkApiKey()) return null;
+      setIsLoading(true);
+      try {
+          const harmonized = await harmonizeNpcProfile(npcData, apiKey);
+          // Keep the ID and ImageUrl from the original to avoid data loss
+          return { ...harmonized, id: npcData.id, imageUrl: npcData.imageUrl };
+      } catch (e) {
+          console.error(e);
+          alert("Erro ao harmonizar a ficha.");
+          return null;
+      } finally {
+          setIsLoading(false);
+      }
+  }
 
   const handleWorldAdjustment = async (faction: FactionData, instruction: string) => {
     if (!checkApiKey()) return;
@@ -490,11 +524,13 @@ export default function App() {
                 onGenerateMap={handleGenerateMap} 
                 onGenerateMembers={handleGenerateFactionMembers} 
                 onGenerateLocations={handleGenerateFactionLocations} 
+                onGenerateResources={handleGenerateFactionResources}
                 isLoading={isLoading} 
                 onGenerateImage={initiateImageGeneration} 
                 isImageLoading={isImageLoading}
                 onUpgradeProfile={handleUpgradeNpcProfile}
                 onApplyAdjustment={handleWorldAdjustment}
+                onHarmonizeNpc={handleHarmonizeNpc}
                 apiKey={apiKey}
               />
             </div>
@@ -527,11 +563,13 @@ export default function App() {
                   onGenerateMap={handleGenerateMap} 
                   onGenerateMembers={handleGenerateFactionMembers} 
                   onGenerateLocations={handleGenerateFactionLocations} 
+                  onGenerateResources={handleGenerateFactionResources}
                   isLoading={isLoading} 
                   onGenerateImage={initiateImageGeneration} 
                   isImageLoading={isImageLoading}
                   onUpgradeProfile={handleUpgradeNpcProfile}
                   onApplyAdjustment={handleWorldAdjustment}
+                  onHarmonizeNpc={handleHarmonizeNpc}
                   apiKey={apiKey}
                 />
               </div>

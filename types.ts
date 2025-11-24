@@ -45,6 +45,7 @@ export interface NpcData {
   // V2 Fields
   birthDate?: string;
   embraceDate?: string;
+  parents?: string; // New field
   likes?: string[]; // 5 items
   dislikes?: string[]; // 5 items
   rumors?: Rumor[];
