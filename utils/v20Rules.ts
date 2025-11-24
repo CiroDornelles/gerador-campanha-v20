@@ -131,6 +131,7 @@ const applyBonusPoints = (sheet: CharacterSheet, nature: string, points: number)
              if(sheet.abilities[k] < 5) { sheet.abilities[k]++; remaining -= COSTS.ABILITY; continue; }
         }
         
+        // Dump remaining if cheap
         if (remaining >= COSTS.WILLPOWER && sheet.willpower < 10) {
             sheet.willpower++; remaining -= COSTS.WILLPOWER;
         } else {

@@ -48,7 +48,7 @@ const detectCreatureType = (clan: string): 'VAMPIRE' | 'GHOUL' | 'MORTAL' => {
 export const generateFoundryActorData = (npc: NpcData) => {
     const creatureType = detectCreatureType(npc.clan);
     
-    // USE EXISTING STATS OR GENERATE NEW
+    // USE EXISTING STATS OR GENERATE NEW ON FLY (but don't save to state unless user clicked generate in UI)
     const stats: V20Stats = npc.stats ? npc.stats : generateV20Stats(npc);
 
     // --- Construct Foundry JSON ---
