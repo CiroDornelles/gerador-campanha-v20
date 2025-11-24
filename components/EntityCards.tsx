@@ -1,11 +1,37 @@
 
 import React, { useState, useEffect } from 'react';
-import { NpcData, FactionData, LocationData, EntityType, GeneratedEntity, Rumor } from '../types';
+import { NpcData, FactionData, LocationData, EntityType, GeneratedEntity, Rumor, WorldContextState } from '../types';
 import { IconSkull, IconMap, IconUsers, IconRefresh, IconSpinner, IconNetwork, IconPlus, IconMagic, IconBriefcase, IconDownload, IconEye, IconX } from './Icons';
 import { EditControls, InputField, TextAreaField, ArrayField } from './FormFields';
 import { RelationshipGraph } from './RelationshipGraph';
 
-// --- Shared Image Component ---
+// --- Shared Components ---
+
+const EntityLink = ({ name, onOpen, worldState }: { name: string, onOpen?: (n: string) => void, worldState?: WorldContextState }) => {
+    if (!onOpen || !worldState) return <>{name}</>;
+    
+    // Check if exists in state
+    const cleanName = name.toLowerCase().trim();
+    const exists = 
+        worldState.npcs.some(n => n.name.toLowerCase() === cleanName) || 
+        worldState.factions.some(f => f.name.toLowerCase() === cleanName) || 
+        worldState.locations.some(l => l.name.toLowerCase() === cleanName);
+
+    if (exists) {
+        return (
+            <button 
+                onClick={() => onOpen(name)} 
+                className="text-blue-300 hover:text-white hover:underline decoration-blue-500 underline-offset-2 transition-colors inline-block"
+                title="Abrir Ficha"
+            >
+                {name}
+            </button>
+        );
+    }
+
+    return <>{name}</>;
+};
+
 const ImageContainer = ({ imageUrl, alt, onRegenerate, isLoading }: { imageUrl?: string, alt: string, onRegenerate: () => void, isLoading: boolean }) => {
   const [showLightbox, setShowLightbox] = useState(false);
 
@@ -111,7 +137,9 @@ export const NpcCard = ({
   onGenerateMinion,
   isImageLoading,
   isLoading,
-  apiKey
+  apiKey,
+  onOpenLink,
+  worldState
 }: { 
   data: NpcData, 
   onUpdate: (d: NpcData) => void, 
@@ -121,7 +149,9 @@ export const NpcCard = ({
   onGenerateMinion?: (n: NpcData, type: 'GHOUL' | 'RETAINER' | 'CHILD') => void,
   isImageLoading: boolean,
   isLoading: boolean,
-  apiKey: string
+  apiKey: string,
+  onOpenLink?: (name: string) => void,
+  worldState?: WorldContextState
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState(data);
@@ -159,7 +189,7 @@ export const NpcCard = ({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
               <div className="space-y-1">
                 <p><strong>Geração:</strong> {data.generation}</p>
-                <p><strong>Senhor:</strong> {data.sire}</p>
+                <p><strong>Senhor:</strong> <EntityLink name={data.sire} onOpen={onOpenLink} worldState={worldState} /></p>
                 <p><strong>Natureza:</strong> {data.nature}</p>
                 <p><strong>Comportamento:</strong> {data.demeanor}</p>
                 {data.parents && <p className="text-sm text-gray-700"><strong>Pais Mortais:</strong> {data.parents}</p>}
@@ -228,13 +258,26 @@ export const NpcCard = ({
                </button>
             )}
 
+            {/* Minions Section */}
+            {(data.minions && data.minions.length > 0) && (
+                 <div className="mt-4 pt-4 border-t border-gray-300">
+                    <h4 className="font-bold font-serif uppercase text-xs tracking-widest mb-2 text-gray-600">Lacaios & Crias</h4>
+                    <div className="flex flex-wrap gap-2">
+                        {data.minions.map((minionName, i) => (
+                            <span key={i} className="bg-gray-800 text-white px-2 py-1 text-xs rounded shadow-sm border border-gray-600">
+                                <EntityLink name={minionName} onOpen={onOpenLink} worldState={worldState} />
+                            </span>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {onGenerateMinion && (
-                <div className="mt-4 pt-4 border-t border-gray-300">
-                    <h4 className="font-bold font-serif uppercase text-xs tracking-widest mb-2 text-gray-600">Criar Lacaios</h4>
+                <div className="mt-2 pt-2">
                     <div className="flex gap-2">
-                        <button onClick={() => onGenerateMinion(data, 'GHOUL')} disabled={isLoading} className="btn-press flex-1 py-1.5 bg-gray-800 text-white rounded text-xs uppercase hover:bg-blood transition-colors">Ghoul</button>
-                        <button onClick={() => onGenerateMinion(data, 'RETAINER')} disabled={isLoading} className="btn-press flex-1 py-1.5 bg-gray-800 text-white rounded text-xs uppercase hover:bg-blood transition-colors">Mortal</button>
-                        <button onClick={() => onGenerateMinion(data, 'CHILD')} disabled={isLoading} className="btn-press flex-1 py-1.5 bg-gray-800 text-white rounded text-xs uppercase hover:bg-blood transition-colors">Cria</button>
+                        <button onClick={() => onGenerateMinion(data, 'GHOUL')} disabled={isLoading} className="btn-press flex-1 py-1.5 bg-gray-800 text-white rounded text-xs uppercase hover:bg-blood transition-colors opacity-80 hover:opacity-100">Criar Ghoul</button>
+                        <button onClick={() => onGenerateMinion(data, 'RETAINER')} disabled={isLoading} className="btn-press flex-1 py-1.5 bg-gray-800 text-white rounded text-xs uppercase hover:bg-blood transition-colors opacity-80 hover:opacity-100">Criar Mortal</button>
+                        <button onClick={() => onGenerateMinion(data, 'CHILD')} disabled={isLoading} className="btn-press flex-1 py-1.5 bg-gray-800 text-white rounded text-xs uppercase hover:bg-blood transition-colors opacity-80 hover:opacity-100">Criar Cria</button>
                     </div>
                 </div>
             )}
@@ -242,7 +285,11 @@ export const NpcCard = ({
             {data.relationships && (
               <div className="mt-4">
                 <h4 className="font-bold font-serif uppercase text-xs tracking-widest mb-1">Conexões</h4>
-                <ul className="list-disc list-inside text-sm">{data.relationships.map((rel, i) => <li key={i}>{rel}</li>)}</ul>
+                <ul className="list-disc list-inside text-sm">
+                    {data.relationships.map((rel, i) => (
+                        <li key={i}><EntityLink name={rel} onOpen={onOpenLink} worldState={worldState} /></li>
+                    ))}
+                </ul>
               </div>
             )}
           </div>
@@ -310,7 +357,9 @@ export const FactionCard = ({
   isLoading,
   onRegenerateImage, 
   isImageLoading,
-  apiKey
+  apiKey,
+  onOpenLink,
+  worldState
 }: { 
   data: FactionData, 
   onUpdate: (d: FactionData) => void,
@@ -322,7 +371,9 @@ export const FactionCard = ({
   isLoading: boolean,
   onRegenerateImage: () => void,
   isImageLoading: boolean,
-  apiKey: string
+  apiKey: string,
+  onOpenLink?: (n: string) => void,
+  worldState?: WorldContextState
 }) => {
   const [memberInput, setMemberInput] = useState("3");
   const [locationInput, setLocationInput] = useState("");
@@ -353,7 +404,7 @@ export const FactionCard = ({
               </div>
               <div className="text-right">
                 <p className="text-sm text-gray-400">Líder</p>
-                <p className="text-lg font-bold text-white tracking-wide">{data.leader}</p>
+                <p className="text-lg font-bold text-white tracking-wide"><EntityLink name={data.leader} onOpen={onOpenLink} worldState={worldState} /></p>
               </div>
             </div>
 
@@ -376,7 +427,7 @@ export const FactionCard = ({
                 <div>
                   <h4 className="text-gray-500 text-xs uppercase tracking-widest mb-1">Inimigos</h4>
                   <ul className="text-sm text-red-400 list-disc list-inside">
-                    {data.enemies.map((enem, i) => <li key={i}>{enem}</li>)}
+                    {data.enemies.map((enem, i) => <li key={i}><EntityLink name={enem} onOpen={onOpenLink} worldState={worldState} /></li>)}
                   </ul>
                 </div>
               </div>
@@ -481,7 +532,9 @@ export const LocationCard = ({
   npcList,
   isImageLoading,
   isLoading, 
-  apiKey 
+  apiKey,
+  onOpenLink,
+  worldState
 }: { 
   data: LocationData, 
   onUpdate: (d: LocationData) => void, 
@@ -491,7 +544,9 @@ export const LocationCard = ({
   npcList?: NpcData[],
   isImageLoading: boolean,
   isLoading?: boolean,
-  apiKey: string 
+  apiKey: string,
+  onOpenLink?: (n: string) => void,
+  worldState?: WorldContextState
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState(data);
@@ -540,7 +595,7 @@ export const LocationCard = ({
                <span className="bg-gray-800 px-3 py-1 text-xs rounded-full text-gray-400 uppercase tracking-widest">{data.type}</span>
                <div className="mt-8 w-full">
                  <p className="text-xs text-gray-500 uppercase">Controlado por</p>
-                 <p className="text-blood font-bold">{data.controlledBy}</p>
+                 <p className="text-blood font-bold"><EntityLink name={data.controlledBy} onOpen={onOpenLink} worldState={worldState} /></p>
                </div>
             </div>
 
@@ -566,7 +621,7 @@ export const LocationCard = ({
                         <div className="flex flex-wrap gap-2 mb-4">
                             {data.frequenters.map((freq, i) => (
                                 <span key={i} className="flex items-center gap-1 bg-gray-800 text-gray-200 px-2 py-1 text-xs rounded border border-gray-700 group">
-                                    {freq}
+                                    <EntityLink name={freq} onOpen={onOpenLink} worldState={worldState} />
                                     <button onClick={() => handleRemoveFrequenter(freq)} className="text-gray-500 hover:text-red-500 ml-1"><IconX /></button>
                                 </span>
                             ))}
@@ -662,7 +717,9 @@ export const DisplayCard = ({
   npcList,
   isLoading,
   isImageLoading,
-  apiKey
+  apiKey,
+  onOpenLink,
+  worldState
 }: { 
   entity: GeneratedEntity, 
   onUpdate: (e: GeneratedEntity) => void,
@@ -680,15 +737,17 @@ export const DisplayCard = ({
   npcList?: NpcData[],
   isLoading: boolean,
   isImageLoading: boolean,
-  apiKey: string
+  apiKey: string,
+  onOpenLink?: (n: string) => void,
+  worldState?: WorldContextState
 }) => {
   switch (entity.type) {
     case EntityType.NPC:
-      return <NpcCard data={entity.data} onUpdate={(d) => onUpdate({...entity, data: d})} onRegenerateImage={() => onGenerateImage(entity)} onUpgradeProfile={onUpgradeProfile} onHarmonize={onHarmonizeNpc} onGenerateMinion={onGenerateMinion} isImageLoading={isImageLoading} isLoading={isLoading} apiKey={apiKey} />;
+      return <NpcCard data={entity.data} onUpdate={(d) => onUpdate({...entity, data: d})} onRegenerateImage={() => onGenerateImage(entity)} onUpgradeProfile={onUpgradeProfile} onHarmonize={onHarmonizeNpc} onGenerateMinion={onGenerateMinion} isImageLoading={isImageLoading} isLoading={isLoading} apiKey={apiKey} onOpenLink={onOpenLink} worldState={worldState} />;
     case EntityType.FACTION:
-      return <FactionCard data={entity.data} onUpdate={(d) => onUpdate({...entity, data: d})} onGenerateMap={onGenerateMap} onGenerateMembers={onGenerateMembers} onGenerateLocations={onGenerateLocations} onGenerateResources={onGenerateResources} onApplyAdjustment={onApplyAdjustment} isLoading={isLoading} onRegenerateImage={() => onGenerateImage(entity)} isImageLoading={isImageLoading} apiKey={apiKey} />;
+      return <FactionCard data={entity.data} onUpdate={(d) => onUpdate({...entity, data: d})} onGenerateMap={onGenerateMap} onGenerateMembers={onGenerateMembers} onGenerateLocations={onGenerateLocations} onGenerateResources={onGenerateResources} onApplyAdjustment={onApplyAdjustment} isLoading={isLoading} onRegenerateImage={() => onGenerateImage(entity)} isImageLoading={isImageLoading} apiKey={apiKey} onOpenLink={onOpenLink} worldState={worldState} />;
     case EntityType.LOCATION:
-      return <LocationCard data={entity.data} onUpdate={(d) => onUpdate({...entity, data: d})} onRegenerateImage={() => onGenerateImage(entity)} onGenerateFrequenters={onGenerateLocationFrequenters} onSuggestFrequenters={onSuggestFrequenters} npcList={npcList} isImageLoading={isImageLoading} isLoading={isLoading} apiKey={apiKey} />;
+      return <LocationCard data={entity.data} onUpdate={(d) => onUpdate({...entity, data: d})} onRegenerateImage={() => onGenerateImage(entity)} onGenerateFrequenters={onGenerateLocationFrequenters} onSuggestFrequenters={onSuggestFrequenters} npcList={npcList} isImageLoading={isImageLoading} isLoading={isLoading} apiKey={apiKey} onOpenLink={onOpenLink} worldState={worldState} />;
     default:
       return null;
   }

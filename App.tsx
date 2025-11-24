@@ -210,6 +210,33 @@ export default function App() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
+  // --- Entity Navigation ---
+  const handleOpenLink = (entityName: string) => {
+      // Find entity by name (case insensitive)
+      const targetName = entityName.toLowerCase().trim();
+      
+      const foundNpc = worldState.npcs.find(n => n.name.toLowerCase() === targetName);
+      if (foundNpc) {
+          setSelectedEntity({ type: EntityType.NPC, data: foundNpc });
+          return;
+      }
+      
+      const foundFaction = worldState.factions.find(f => f.name.toLowerCase() === targetName);
+      if (foundFaction) {
+          setSelectedEntity({ type: EntityType.FACTION, data: foundFaction });
+          return;
+      }
+      
+      const foundLocation = worldState.locations.find(l => l.name.toLowerCase() === targetName);
+      if (foundLocation) {
+          setSelectedEntity({ type: EntityType.LOCATION, data: foundLocation });
+          return;
+      }
+
+      // Try fuzzy match? For now, exact match or nothing to avoid annoyance.
+      console.log(`Entity not found: ${entityName}`);
+  };
+
   // --- Update Handler ---
   const handleUpdateEntity = (updatedEntity: GeneratedEntity) => {
     setWorldState(prev => {
@@ -396,7 +423,7 @@ export default function App() {
               npcs: [...npcsWithIds, ...prev.npcs]
           }));
 
-          // Optionally link them to the location in local state for display if needed
+          // Link them to the location in local state for display
           const updatedLoc = {
               ...location,
               frequenters: [...(location.frequenters || []), ...npcsWithIds.map(n => n.name)]
@@ -418,10 +445,19 @@ export default function App() {
       try {
           const minion = await generateNpcMinion(npc, type, worldState, apiKey);
           const minionWithId = { ...minion, id: crypto.randomUUID() };
-           setWorldState(prev => ({
+          
+          setWorldState(prev => ({
               ...prev,
               npcs: [minionWithId, ...prev.npcs]
           }));
+
+          // Link to parent
+          const updatedParent = {
+              ...npc,
+              minions: [...(npc.minions || []), minion.name]
+          };
+          handleUpdateEntity({ type: EntityType.NPC, data: updatedParent });
+
           alert(`${minion.name} (${type}) foi criado.`);
       } catch (e) {
           console.error(e);
@@ -611,6 +647,8 @@ export default function App() {
                 onSuggestFrequenters={handleSuggestFrequenters}
                 npcList={worldState.npcs}
                 apiKey={apiKey}
+                onOpenLink={handleOpenLink}
+                worldState={worldState}
               />
             </div>
           </div>
@@ -654,6 +692,8 @@ export default function App() {
                   onSuggestFrequenters={handleSuggestFrequenters}
                   npcList={worldState.npcs}
                   apiKey={apiKey}
+                  onOpenLink={handleOpenLink}
+                  worldState={worldState}
                 />
               </div>
            </div>

@@ -49,6 +49,7 @@ export interface NpcData {
   likes?: string[]; // 5 items
   dislikes?: string[]; // 5 items
   rumors?: Rumor[];
+  minions?: string[]; // Names of generated subordinates
 }
 
 export interface FactionData {
