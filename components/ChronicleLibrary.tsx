@@ -9,7 +9,14 @@ const EmptyState = () => (
     </div>
 );
 
-const LibraryCard = ({ item, type, onSelect, index }: { item: any, type: EntityType, onSelect: (e: GeneratedEntity) => void, index: number }) => (
+interface LibraryCardProps {
+    item: any;
+    type: EntityType;
+    onSelect: (e: GeneratedEntity) => void;
+    index: number;
+}
+
+const LibraryCard: React.FC<LibraryCardProps> = ({ item, type, onSelect, index }) => (
     <div 
       onClick={() => onSelect({ type, data: item })}
       className="card-hover group bg-panel border border-gray-800 hover:border-blood transition-all p-4 rounded cursor-pointer flex gap-4 items-start animate-fade-in-up"
